@@ -269,7 +269,6 @@ while True:
             mode = TrainMode.JOINT
             epoch += 1
     elif mode == TrainMode.LAST_ONLY:
-        print('iteration: \t{0}'.format(iteration))
         write_mode(TrainMode.LAST_ONLY, log_writer, step)
         last_only(model=ppnet)
         train(model=ppnet, dataloader=train_loader, optimizer=last_layer_optimizer,

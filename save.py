@@ -67,7 +67,10 @@ def load_train_state(file_path: str, model: torch.nn.Module, things_with_state: 
 
 def load_model_from_train_state(file_path: str, model: torch.nn.Module):
     data = torch.load(file_path)
-    model.load_state_dict(data['model'])
+    if 'model' in data:
+        model.load_state_dict(data['model'])
+    else:
+        model.load_state_dict(data)
 
 
 def _git_command(*args: str):
