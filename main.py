@@ -13,7 +13,7 @@ from helpers import makedir
 from model import construct_PPNet
 from preprocess import preprocess_input_function
 from push import push_prototypes
-from save import load_train_state, save_train_state
+from save import load_train_state, save_train_state, get_state_path_for_prefix
 from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS
 from train_and_test import warm_only, train, joint, test, last_only, TrainMode
 
@@ -130,12 +130,17 @@ other_state = {
     'last_layer_optimizer': last_layer_optimizer,
 }
 
-checkpoint_file = '{}.{}.pck'.format(CHECKPOINT_PREFIX, args.dataset)
+checkpoint_file_prefix = '{}.{}'.format(CHECKPOINT_PREFIX, args.dataset)
+checkpoint_files = get_state_path_for_prefix(checkpoint_file_prefix)
 load_state_path = None
 if args.load_state:
     load_state_path = args.load_state
-elif not args.new_experiment and os.path.exists(checkpoint_file):
-    load_state_path = checkpoint_file
+elif not args.new_experiment and len(checkpoint_files) > 0:
+    if len(checkpoint_files) > 1:
+        print('Multiple checkpoint files detected: {}'.format(checkpoint_files))
+        print('Leave only one and remove all others to continue or specify which one to use with --load_state')
+        exit(1)
+    load_state_path = checkpoint_files[0]
 if load_state_path:
     print('Loading state from: {}'.format(load_state_path))
     (step,
@@ -211,7 +216,7 @@ last_checkpoint = step
 push_model_state = False
 
 while True:
-    print('mode: {}, step: {}, epoch: {}, iteration: {}'.format(mode.name, step, epoch, iteration))
+    print('step: {}, mode: {}, epoch: {}, iteration: {}'.format(step, mode.name, epoch, iteration))
     if mode == TrainMode.WARM:
         write_mode(TrainMode.WARM, log_writer, step)
         warm_only(model=ppnet)
@@ -280,24 +285,31 @@ while True:
         break
     step += 1
 
+    do_snapshot = False
+
     if last_checkpoint + CHECKPOINT_FREQUENCY_STEPS <= step:
-        print('Saving checkpoint')
-        save_train_state(checkpoint_file, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
-                         best_accu, current_push_best_accu)
-        last_checkpoint = step
+        do_snapshot = True
 
     if accu > best_accu:
-        best_model_path = os.path.join(model_dir, 'best.pck')
+        do_snapshot = True
+        best_model_path = os.path.join(model_dir, 'best')
         save_train_state(best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
                          best_accu, current_push_best_accu)
         best_accu = accu
         print('New best score: {}, saving snapshot'.format(best_accu))
 
     if push_model_state and accu > current_push_best_accu:
-        push_best_model_path = os.path.join(model_dir, '{}.push.best.pck'.format(epoch))
+        do_snapshot = True
+        push_best_model_path = os.path.join(model_dir, '{}.push.best'.format(epoch))
         save_train_state(push_best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
                          best_accu, current_push_best_accu)
         current_push_best_accu = accu
         print('Push {} best score: {}, saving snapshot'.format(epoch, best_accu))
+
+    if do_snapshot:
+        print('Saving checkpoint')
+        save_train_state(checkpoint_file_prefix, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
+                         best_accu, current_push_best_accu)
+        last_checkpoint = step
 
 log_writer.close()

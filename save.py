@@ -1,4 +1,6 @@
 import os
+from glob import glob
+from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 
 import torch
@@ -13,12 +15,13 @@ def save_model_w_condition(model, model_dir, model_name, accu, target_accu, log=
 
     if accu >= target_accu:
         log('\tabove {0:.2f}%'.format(target_accu * 100))
-        torch.save(obj=model, f=os.path.join(model_dir, (model_name + '{0:.4f}.pth').format(accu)))
+        torch.save(obj=model, f=os.path.join(model_dir, (model_name + '{0:.4f}.pth').format(accu * 100)))
 
 
-def save_train_state(file_path: str, model: torch.nn.Module, things_with_state: Dict[str, Any],
+def save_train_state(file_path_prefix: str, model: torch.nn.Module, things_with_state: Dict[str, Any],
                      step: int, mode: TrainMode, epoch: int, iteration: Optional[int], experiment_run_name: str,
                      best_accu: float, current_push_best_accu: Optional[float]):
+    file_path = '{}.{}.{:.2f}.pck'.format(file_path_prefix, step, best_accu)
     # save and atomic replace
     new_file_path = file_path + '.new'
     try:
@@ -35,9 +38,16 @@ def save_train_state(file_path: str, model: torch.nn.Module, things_with_state: 
         }, new_file_path)
         # atomic on POSIX
         os.replace(new_file_path, file_path)
+        files = get_state_path_for_prefix(file_path_prefix)
+        [os.remove(f) for f in files if f != file_path]
     finally:
         if os.path.exists(new_file_path):
             os.remove(new_file_path)
+
+
+def get_state_path_for_prefix(file_path_prefix: str):
+    files = glob(file_path_prefix + '*')
+    return files
 
 
 def load_train_state(file_path: str, model: torch.nn.Module, things_with_state: Dict[str, Any]) -> \
