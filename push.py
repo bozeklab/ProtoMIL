@@ -1,5 +1,4 @@
 import os
-import time
 
 import cv2
 import matplotlib.pyplot as plt
@@ -26,7 +25,6 @@ def push_prototypes(dataloader,  # pytorch dataloader (must be unnormalized in [
     prototype_network_parallel.eval()
     print('\tpush')
 
-    start = time.time()
     prototype_shape = prototype_network_parallel.prototype_shape
     n_prototypes = prototype_network_parallel.num_prototypes
     # saves the closest distance seen so far
@@ -58,8 +56,8 @@ def push_prototypes(dataloader,  # pytorch dataloader (must be unnormalized in [
         proto_bound_boxes = np.full(shape=[n_prototypes, 5],
                                     fill_value=-1)
 
-    if root_dir_for_saving_prototypes != None:
-        if epoch_number != None:
+    if root_dir_for_saving_prototypes is not None:
+        if epoch_number is not None:
             proto_epoch_dir = os.path.join(root_dir_for_saving_prototypes,
                                            'epoch-' + str(epoch_number))
             makedir(proto_epoch_dir)
@@ -107,8 +105,6 @@ def push_prototypes(dataloader,  # pytorch dataloader (must be unnormalized in [
                                   tuple(prototype_shape))
     prototype_network_parallel.prototype_vectors.data.copy_(torch.tensor(prototype_update, dtype=torch.float32).cuda())
     # prototype_network_parallel.cuda()
-    end = time.time()
-    print('\tpush time: \t{0}'.format(end - start))
 
 
 # update each prototype for current search batch

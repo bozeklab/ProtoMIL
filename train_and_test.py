@@ -1,3 +1,5 @@
+from enum import Enum
+
 import numpy as np
 import torch
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -5,6 +7,13 @@ from torch.utils.tensorboard import SummaryWriter
 
 from focalloss import FocalLoss
 from helpers import list_of_distances
+
+
+class TrainMode(Enum):
+    WARM = 'warm'
+    JOINT = 'joint'
+    PUSH = 'push'
+    LAST_ONLY = 'last_only'
 
 
 def _train_or_test(model, dataloader, optimizer=None, class_specific=True, use_l1_mask=True,
@@ -118,8 +127,8 @@ def _train_or_test(model, dataloader, optimizer=None, class_specific=True, use_l
     total_separation_cost /= n_batches
     total_loss /= n_batches
 
-    print('accuracy:', n_correct / n_examples)
-    print('total_loss:', total_loss)
+    print('\t\taccuracy:', n_correct / n_examples)
+    print('\t\ttotal_loss:', total_loss)
 
     suffix = '/train' if is_train else '/test'
     if log_writer:
@@ -186,8 +195,6 @@ def last_only(model):
     _unfreeze_layer(model.attention_weights)
     _unfreeze_layer(model.last_layer)
 
-    print('\tlast layer')
-
 
 def warm_only(model):
     _freeze_layer(model.features)
@@ -201,8 +208,6 @@ def warm_only(model):
 
     _unfreeze_layer(model.last_layer)
 
-    print('\twarm')
-
 
 def joint(model):
     _unfreeze_layer(model.features)
@@ -214,5 +219,3 @@ def joint(model):
     _freeze_layer(model.attention_U)
     _freeze_layer(model.attention_weights)
     _freeze_layer(model.last_layer)
-
-    print('\tjoint')
