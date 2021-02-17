@@ -1,7 +1,7 @@
 import os
 import subprocess
 from glob import glob
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple
 
 import torch
 
@@ -20,8 +20,8 @@ def save_model_w_condition(model, model_dir, model_name, accu, target_accu, log=
 
 def save_train_state(file_path_prefix: str, model: torch.nn.Module, things_with_state: Dict[str, Any],
                      step: int, mode: TrainMode, epoch: int, iteration: Optional[int], experiment_run_name: str,
-                     best_accu: float, current_push_best_accu: Optional[float]):
-    file_path = '{}.{}.{:.2f}.pck'.format(file_path_prefix, step, best_accu)
+                     best_accu: float, current_push_best_accu: Optional[float], current_accu: float):
+    file_path = '{}.{}.{:.2f}.pck'.format(file_path_prefix, step, current_accu)
     # save and atomic replace
     new_file_path = file_path + '.new'
     try:

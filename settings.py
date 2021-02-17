@@ -59,7 +59,7 @@ MNIST_SETTINGS = Settings(
     },
     num_train_epochs=101,
     num_warm_epochs=5,
-    num_last_layer_iterations=15,
+    num_last_layer_iterations=20,
     push_start=10,
     push_epochs=[i for i in range(1000) if i % 10 == 0]
 )

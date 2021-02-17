@@ -217,6 +217,7 @@ def write_mode(mode: TrainMode, log_writer: SummaryWriter, step: int):
 last_checkpoint = step
 push_model_state = False
 
+# training loop as a state machine.
 while True:
     print('step: {}, mode: {}, epoch: {}, iteration: {}'.format(step, mode.name, epoch, iteration))
     if mode == TrainMode.WARM:
@@ -293,25 +294,29 @@ while True:
         do_snapshot = True
 
     if accu > best_accu:
+        best_accu = accu
         do_snapshot = True
         best_model_path = os.path.join(model_dir, 'best')
         save_train_state(best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
-                         best_accu, current_push_best_accu)
-        best_accu = accu
+                         best_accu, current_push_best_accu, accu)
         print('New best score: {}, saving snapshot'.format(best_accu))
 
     if push_model_state and accu > current_push_best_accu:
+        current_push_best_accu = accu
         do_snapshot = True
         push_best_model_path = os.path.join(model_dir, '{}.push.best'.format(epoch))
         save_train_state(push_best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
-                         best_accu, current_push_best_accu)
-        current_push_best_accu = accu
+                         best_accu, current_push_best_accu, accu)
         print('Push {} best score: {}, saving snapshot'.format(epoch, best_accu))
 
     if do_snapshot:
         print('Saving checkpoint')
         save_train_state(checkpoint_file_prefix, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
-                         best_accu, current_push_best_accu)
+                         best_accu, current_push_best_accu, accu)
         last_checkpoint = step
 
+best_model_path = os.path.join(model_dir, 'end')
+save_train_state(best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
+                 best_accu, current_push_best_accu, accu)
+[os.remove(checkpoint) for checkpoint in get_state_path_for_prefix(checkpoint_file_prefix)]
 log_writer.close()
