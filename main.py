@@ -3,6 +3,7 @@ import datetime
 import os
 import platform
 
+import matplotlib
 import torch.utils.data
 from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
@@ -16,6 +17,8 @@ from push import push_prototypes
 from save import load_train_state, save_train_state, get_state_path_for_prefix, snapshot_code
 from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS
 from train_and_test import warm_only, train, joint, test, last_only, TrainMode
+
+matplotlib.use('Agg')
 
 CHECKPOINT_PREFIX = 'checkpoint'
 LOGS_DIR = 'runs'
@@ -68,7 +71,7 @@ ppnet = construct_PPNet(base_architecture=config.base_architecture,
                         add_on_layers_type=config.add_on_layers_type)
 ppnet = ppnet.cuda()
 
-summary(ppnet, (1, 3, config.img_size, config.img_size))
+summary(ppnet, (10, 3, config.img_size, config.img_size), col_names=("input_size", "output_size", "num_params"))
 
 joint_optimizer_specs = [
     {
