@@ -1,7 +1,7 @@
 import os
+import subprocess
 from glob import glob
-from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 import torch
 
@@ -68,3 +68,18 @@ def load_train_state(file_path: str, model: torch.nn.Module, things_with_state: 
 def load_model_from_train_state(file_path: str, model: torch.nn.Module):
     data = torch.load(file_path)
     model.load_state_dict(data['model'])
+
+
+def _git_command(*args: str):
+    subprocess.check_output(['git', '--git-dir=experiments', '--work-tree=.'] + list(args))
+
+
+def _init_git_if_required():
+    _git_command('init', '-q')
+
+
+def snapshot_code(experiment_run_name):
+    _init_git_if_required()
+    _git_command('add', '*.py')
+    _git_command('commit', '-m', experiment_run_name, '-q')
+    pass

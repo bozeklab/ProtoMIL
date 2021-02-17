@@ -13,7 +13,7 @@ from helpers import makedir
 from model import construct_PPNet
 from preprocess import preprocess_input_function
 from push import push_prototypes
-from save import load_train_state, save_train_state, get_state_path_for_prefix
+from save import load_train_state, save_train_state, get_state_path_for_prefix, snapshot_code
 from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS
 from train_and_test import warm_only, train, joint, test, last_only, TrainMode
 
@@ -161,6 +161,8 @@ else:
     best_accu = 0.
     current_push_best_accu = None
     print('Starting new experiment: {}'.format(experiment_run_name))
+    print('Saving code snapshot with git-experiments')
+    snapshot_code(experiment_run_name)
 
 model_dir = os.path.join(SAVED_MODELS_PATH, experiment_run_name)
 makedir(model_dir)
