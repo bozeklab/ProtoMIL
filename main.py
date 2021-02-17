@@ -215,7 +215,7 @@ def write_mode(mode: TrainMode, log_writer: SummaryWriter, step: int):
 
 
 last_checkpoint = step
-push_model_state = False
+push_model_state_epoch = None
 
 # training loop as a state machine.
 while True:
@@ -227,7 +227,7 @@ while True:
               class_specific=config.class_specific, coefs=config.coefs, log_writer=log_writer, step=step)
         accu = test(model=ppnet, dataloader=test_loader,
                     class_specific=config.class_specific, log_writer=log_writer, step=step)
-        push_model_state = False
+        push_model_state_epoch = None
         epoch += 1
         if epoch >= config.num_warm_epochs:
             mode = TrainMode.JOINT
@@ -239,7 +239,7 @@ while True:
         joint_lr_scheduler.step()
         accu = test(model=ppnet, dataloader=test_loader,
                     class_specific=config.class_specific, log_writer=log_writer, step=step)
-        push_model_state = False
+        push_model_state_epoch = None
         if epoch >= config.push_start and epoch in config.push_epochs:
             mode = TrainMode.PUSH
         else:
@@ -260,7 +260,7 @@ while True:
             save_prototype_class_identity=True)
         accu = test(model=ppnet, dataloader=test_loader,
                     class_specific=config.class_specific, log_writer=log_writer, step=step)
-        push_model_state = True
+        push_model_state_epoch = epoch
         current_push_best_accu = 0.
         if config.prototype_activation_function != 'linear':
             mode = TrainMode.LAST_ONLY
@@ -277,7 +277,7 @@ while True:
         accu = test(model=ppnet, dataloader=test_loader,
                     class_specific=config.class_specific, log_writer=log_writer, step=step)
         iteration += 1
-        push_model_state = True
+        push_model_state_epoch = epoch
         if iteration >= config.num_last_layer_iterations:
             iteration = None
             epoch += 1
@@ -301,10 +301,10 @@ while True:
                          best_accu, current_push_best_accu, accu)
         print('New best score: {}, saving snapshot'.format(best_accu))
 
-    if push_model_state and accu > current_push_best_accu:
+    if push_model_state_epoch is not None and accu > current_push_best_accu:
         current_push_best_accu = accu
         do_snapshot = True
-        push_best_model_path = os.path.join(model_dir, '{}.push.best'.format(epoch))
+        push_best_model_path = os.path.join(model_dir, '{}.push.best'.format(push_model_state_epoch))
         save_train_state(push_best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
                          best_accu, current_push_best_accu, accu)
         print('Push {} best score: {}, saving snapshot'.format(epoch, best_accu))

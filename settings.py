@@ -42,7 +42,7 @@ class Settings:
 MNIST_SETTINGS = Settings(
     base_architecture='resnet18_small',
     img_size=28,
-    prototype_shape=(20, 512, 2, 2),
+    prototype_shape=(10, 128, 2, 2),
     joint_optimizer_lrs={
         'features': 1e-4,
         'add_on_layers': 3e-3,
