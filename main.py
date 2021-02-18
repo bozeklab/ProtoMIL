@@ -20,10 +20,15 @@ from train_and_test import warm_only, train, joint, test, last_only, TrainMode
 
 matplotlib.use('Agg')
 
+DEBUG = False
+
 CHECKPOINT_PREFIX = 'checkpoint'
 LOGS_DIR = 'runs'
 SAVED_MODELS_PATH = 'saved_models'
 CHECKPOINT_FREQUENCY_STEPS = 3
+
+seed = torch.seed()
+torch.manual_seed(seed)
 
 # noinspection PyTypeChecker
 parser = argparse.ArgumentParser(prog='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -162,7 +167,7 @@ else:
     iteration = None
     experiment_run_name = '{}.{}.{}'.format(args.dataset, platform.node(), datetime.datetime.now().isoformat())
     best_accu = 0.
-    current_push_best_accu = None
+    current_push_best_accu = 0.
     print('Starting new experiment: {}'.format(experiment_run_name))
     print('Saving code snapshot with git-experiments')
     snapshot_code(experiment_run_name)
@@ -179,22 +184,23 @@ prototype_img_filename_prefix = 'prototype-img'
 prototype_self_act_filename_prefix = 'prototype-self-act'
 proto_bound_boxes_filename_prefix = 'bb'
 
-seed = torch.seed()
-torch.manual_seed(seed)
+
 
 log_writer.add_text('seed', str(seed))
 
+workers = 0 if DEBUG else 8
+
 train_loader = torch.utils.data.DataLoader(
     ds, batch_size=None, shuffle=True,
-    num_workers=8,
+    num_workers=workers,
     pin_memory=True)
 train_push_loader = torch.utils.data.DataLoader(
     ds_push, batch_size=None, shuffle=False,
-    num_workers=8,
+    num_workers=workers,
     pin_memory=True)
 test_loader = torch.utils.data.DataLoader(
     ds_test, batch_size=None, shuffle=False,
-    num_workers=8,
+    num_workers=workers,
     pin_memory=True)
 
 # noinspection PyTypeChecker
@@ -301,7 +307,7 @@ while True:
         best_model_path = os.path.join(model_dir, 'best')
         save_train_state(best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
                          best_accu, current_push_best_accu, accu)
-        print('New best score: {}, saving snapshot'.format(best_accu))
+        print('New best score: {}, saving snapshot'.format(accu))
 
     if push_model_state_epoch is not None and accu > current_push_best_accu:
         current_push_best_accu = accu
@@ -309,7 +315,7 @@ while True:
         push_best_model_path = os.path.join(model_dir, '{}.push.best'.format(push_model_state_epoch))
         save_train_state(push_best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
                          best_accu, current_push_best_accu, accu)
-        print('Push {} best score: {}, saving snapshot'.format(epoch, best_accu))
+        print('Push {} best score: {}, saving snapshot'.format(epoch, accu))
 
     if do_snapshot:
         print('Saving checkpoint')

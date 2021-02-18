@@ -84,5 +84,4 @@ def _init_git_if_required():
 def snapshot_code(experiment_run_name):
     _init_git_if_required()
     _git_command('add', '*.py')
-    _git_command('commit', '-m', experiment_run_name, '-q')
-    pass
+    _git_command('commit', '--allow-empty', '-m', experiment_run_name, '-q')

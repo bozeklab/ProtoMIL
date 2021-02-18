@@ -336,12 +336,6 @@ class PPNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
         self.set_last_layer_incorrect_connection(incorrect_strength=-0.5)
-        nn.init.constant_(self.attention_weights.weight, 1)
-        nn.init.constant_(self.attention_weights.bias, 0)
-        nn.init.constant_(self.attention_U[0].weight, 1)
-        nn.init.constant_(self.attention_U[0].bias, 0)
-        nn.init.constant_(self.attention_V[0].weight, 1)
-        nn.init.constant_(self.attention_V[0].bias, 0)
 
 
 def construct_PPNet(base_architecture, pretrained=True, img_size=224,
