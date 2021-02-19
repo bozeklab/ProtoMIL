@@ -23,6 +23,7 @@ class ColonCancerBagsCross(data_utils.Dataset):
         self.shuffle_bag = shuffle_bag
         self.data_augmentation = data_augmentation
         self.location_info = loc_info
+        self.push = push
         self.nucleus_type = nucleus_type
 
         tr = [utils_augemntation.RandomHEStain(),
@@ -35,14 +36,14 @@ class ColonCancerBagsCross(data_utils.Dataset):
         tst = [utils_augemntation.HistoNormalize(),
                transforms.ToTensor()
                ]
-        if not push:
-            norma = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-            tr.append(norma)
-            tst.append(norma)
+        
+        psh = [transforms.ToTensor()]
 
         self.data_augmentation_img_transform = transforms.Compose(tr)
 
         self.normalize_to_tensor_transform = transforms.Compose(tst)
+
+        self.to_tensor_transform = transforms.Compose(psh)
 
         self.dir_list_train, self.dir_list_test = self.split_dir_list(self.path, self.train_val_idxs, self.test_idxs)
         if self.train:
@@ -78,6 +79,7 @@ class ColonCancerBagsCross(data_utils.Dataset):
             # bmp to pillow
             img_dir = dir + '/' + img_name + '.bmp'
             img = io.imread(img_dir)
+
             if img.shape[2] == 4:
                 img = color.rgba2rgb(img)
 
@@ -286,7 +288,9 @@ class ColonCancerBagsCross(data_utils.Dataset):
         return bag_list, labels_list
 
     def transform_and_data_augmentation(self, bag):
-        if self.data_augmentation:
+        if self.push:
+            img_transform = self.to_tensor_transform
+        elif self.data_augmentation:
             img_transform = self.data_augmentation_img_transform
         else:
             img_transform = self.normalize_to_tensor_transform
@@ -300,6 +304,7 @@ class ColonCancerBagsCross(data_utils.Dataset):
                      )))
             else:
                 bag_tensors.append(img_transform(img))
+        
         return torch.stack(bag_tensors)
 
     def __len__(self):

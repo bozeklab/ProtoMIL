@@ -53,7 +53,7 @@ if args.dataset == 'colon_cancer':
     train_range, test_range = range(split_val), range(split_val, 100)
 
     ds = ColonCancerBagsCross(path="data/ColonCancer", train=True, train_val_idxs=train_range, test_idxs=test_range,
-                              shuffle_bag=True)
+                              shuffle_bag=True, data_augmentation=True)
     ds_push = ColonCancerBagsCross(path="data/ColonCancer", train=True, train_val_idxs=train_range,
                                    test_idxs=test_range,
                                    push=True, shuffle_bag=True)
@@ -259,7 +259,7 @@ while True:
             train_push_loader,  # pytorch dataloader (must be unnormalized in [0,1])
             prototype_network_parallel=ppnet,
             class_specific=config.class_specific,
-            preprocess_input_function=preprocess_input_function,  # normalize if needed
+            # preprocess_input_function=preprocess_input_function,  # normalize if needed
             prototype_layer_stride=1,
             root_dir_for_saving_prototypes=img_dir,
             epoch_number=epoch,
