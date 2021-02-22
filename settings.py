@@ -1,6 +1,6 @@
 import dataclasses
 from dataclasses import dataclass
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,14 @@ class Settings:
 
     prototype_activation_function: str = 'log'
     add_on_layers_type: str = 'regular'
+    loss_function: str = 'cross_entropy'
     class_specific: bool = True
+
+    random_seed_presets: List[int] = dataclasses.field(
+        default_factory=lambda: [631056511, 923928841, 53306087, 937272127, 207121037])
+    random_seed_id: Optional[int] = 0
+    # overrides random seed preset and id.
+    random_seed_value = None
 
     @property
     def coefs(self):
@@ -87,7 +94,7 @@ MNIST_SETTINGS = Settings(
 COLON_CANCER_SETTINGS = Settings(
     base_architecture='resnet18_small',
     img_size=27,
-    prototype_shape=(10, 128, 2, 2),
+    prototype_shape=(20, 128, 2, 2),
     joint_optimizer_lrs={
         'features': 1e-4,
         'add_on_layers': 3e-3,

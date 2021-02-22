@@ -31,9 +31,6 @@ LOGS_DIR = 'runs'
 SAVED_MODELS_PATH = 'saved_models'
 CHECKPOINT_FREQUENCY_STEPS = 3
 
-seed = torch.seed()
-torch.manual_seed(seed)
-
 # noinspection PyTypeChecker
 parser = argparse.ArgumentParser(prog='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpuid', type=int, default=0, help='CUDA device id to use')
@@ -76,6 +73,14 @@ else:
 
 config = config.new_from_params(args)
 
+if config.random_seed_value is not None:
+    seed = config.random_seed_value
+elif config.random_seed_id is not None:
+    seed = config.random_seed_presets[config.random_seed_id]
+else:
+    seed = torch.seed()
+torch.manual_seed(seed)
+
 ppnet = construct_PPNet(base_architecture=config.base_architecture,
                         pretrained=False, img_size=config.img_size,
                         prototype_shape=config.prototype_shape,
@@ -85,6 +90,8 @@ ppnet = construct_PPNet(base_architecture=config.base_architecture,
 ppnet = ppnet.cuda()
 
 print(config)
+
+print('Seed: {}'.format(seed))
 
 summary(ppnet, (10, 3, config.img_size, config.img_size), col_names=("input_size", "output_size", "num_params"))
 
@@ -243,10 +250,9 @@ while True:
             print('\tattention disabled')
         write_mode(TrainMode.WARM, log_writer, step)
         warm_only(model=ppnet)
-        train(model=ppnet, dataloader=train_loader, optimizer=warm_optimizer,
-              class_specific=config.class_specific, coefs=config.coefs, log_writer=log_writer, step=step)
-        accu = test(model=ppnet, dataloader=test_loader,
-                    class_specific=config.class_specific, log_writer=log_writer, step=step)
+        train(model=ppnet, dataloader=train_loader, optimizer=warm_optimizer, config=config, log_writer=log_writer,
+              step=step)
+        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step)
         push_model_state_epoch = None
         epoch += 1
         if epoch >= config.num_warm_epochs:
@@ -254,11 +260,10 @@ while True:
     elif mode == TrainMode.JOINT:
         write_mode(TrainMode.JOINT, log_writer, step)
         joint(model=ppnet)
-        train(model=ppnet, dataloader=train_loader, optimizer=joint_optimizer,
-              class_specific=config.class_specific, coefs=config.coefs, log_writer=log_writer, step=step)
+        train(model=ppnet, dataloader=train_loader, optimizer=joint_optimizer, config=config, log_writer=log_writer,
+              step=step)
         joint_lr_scheduler.step()
-        accu = test(model=ppnet, dataloader=test_loader,
-                    class_specific=config.class_specific, log_writer=log_writer, step=step)
+        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step)
         push_model_state_epoch = None
         if epoch >= config.push_start and epoch in config.push_epochs:
             mode = TrainMode.PUSH
@@ -278,8 +283,7 @@ while True:
             prototype_self_act_filename_prefix=prototype_self_act_filename_prefix,
             proto_bound_boxes_filename_prefix=proto_bound_boxes_filename_prefix,
             save_prototype_class_identity=True)
-        accu = test(model=ppnet, dataloader=test_loader,
-                    class_specific=config.class_specific, log_writer=log_writer, step=step)
+        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step)
         push_model_state_epoch = epoch
         current_push_best_accu = 0.
         if not ppnet.attention_enabled:
@@ -294,10 +298,9 @@ while True:
     elif mode == TrainMode.LAST_ONLY:
         write_mode(TrainMode.LAST_ONLY, log_writer, step)
         last_only(model=ppnet)
-        train(model=ppnet, dataloader=train_loader, optimizer=last_layer_optimizer,
-              class_specific=config.class_specific, coefs=config.coefs, log_writer=log_writer, step=step)
-        accu = test(model=ppnet, dataloader=test_loader,
-                    class_specific=config.class_specific, log_writer=log_writer, step=step)
+        train(model=ppnet, dataloader=train_loader, optimizer=last_layer_optimizer, config=config,
+              log_writer=log_writer, step=step)
+        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step)
         iteration += 1
         push_model_state_epoch = epoch
         if iteration >= config.num_last_layer_iterations:

@@ -7,6 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from focalloss import FocalLoss
 from helpers import list_of_distances
+from settings import Settings
 
 
 class TrainMode(Enum):
@@ -16,8 +17,8 @@ class TrainMode(Enum):
     LAST_ONLY = 'last_only'
 
 
-def _train_or_test(model, dataloader, optimizer=None, class_specific=True, use_l1_mask=True,
-                   coefs=None, log_writer: SummaryWriter = None, step: int = 0):
+def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_mask=True,
+                   log_writer: SummaryWriter = None, step: int = 0):
     '''
     model: the multi-gpu model
     dataloader:
@@ -35,6 +36,13 @@ def _train_or_test(model, dataloader, optimizer=None, class_specific=True, use_l
     total_loss = 0
     conf_matrix = np.zeros((2, 2), dtype='int32')
 
+    if config.loss_function == 'cross_entropy':
+        loss_fn = torch.nn.CrossEntropyLoss()
+    elif config.loss_function == 'focal':
+        loss_fn = FocalLoss(alpha=0.5, gamma=2)
+    else:
+        raise NotImplementedError('unknown loss function: ' + config.loss_function)
+
     for i, (image, label) in enumerate(dataloader):
         input = image.cuda()
         target = label.cuda()
@@ -44,9 +52,9 @@ def _train_or_test(model, dataloader, optimizer=None, class_specific=True, use_l
         with grad_req:
             output, min_distances = model(input)
 
-            cross_entropy = FocalLoss(alpha=0.5, gamma=2)(output, target)
+            cross_entropy = loss_fn(output, target)
 
-            if class_specific:
+            if config.class_specific:
                 max_dist = (model.prototype_shape[1]
                             * model.prototype_shape[2]
                             * model.prototype_shape[3])
@@ -94,21 +102,15 @@ def _train_or_test(model, dataloader, optimizer=None, class_specific=True, use_l
             total_avg_separation_cost += avg_separation_cost.item()
 
         # compute gradient and do SGD step
-        if class_specific:
-            if coefs is not None:
-                loss = (coefs['crs_ent'] * cross_entropy
-                        + coefs['clst'] * cluster_cost
-                        + coefs['sep'] * separation_cost
-                        + coefs['l1'] * l1)
-            else:
-                loss = cross_entropy + 0.8 * cluster_cost - 0.08 * separation_cost + 1e-4 * l1
+        if config.class_specific:
+            loss = (config.coef_crs_ent * cross_entropy
+                    + config.coef_clst * cluster_cost
+                    + config.coef_sep * separation_cost
+                    + config.coef_l1 * l1)
         else:
-            if coefs is not None:
-                loss = (coefs['crs_ent'] * cross_entropy
-                        + coefs['clst'] * cluster_cost
-                        + coefs['l1'] * l1)
-            else:
-                loss = cross_entropy + 0.8 * cluster_cost + 1e-4 * l1
+            loss = (config.coef_crs_ent * cross_entropy
+                    + config.coef_clst * cluster_cost
+                    + config.coef_l1 * l1)
         total_loss += loss.item()
         if is_train:
             optimizer.zero_grad()
@@ -137,7 +139,7 @@ def _train_or_test(model, dataloader, optimizer=None, class_specific=True, use_l
         log_writer.add_scalar('cross_entropy' + suffix, total_cross_entropy, global_step=step)
         log_writer.add_scalar('cluster_cost' + suffix, total_cluster_cost, global_step=step)
 
-        if class_specific:
+        if config.class_specific:
             log_writer.add_scalar('separation_cost' + suffix, total_separation_cost, global_step=step)
             log_writer.add_scalar('avg_separation_cost' + suffix, total_avg_separation_cost / n_batches,
                                   global_step=step)
@@ -157,21 +159,21 @@ def _train_or_test(model, dataloader, optimizer=None, class_specific=True, use_l
     return n_correct / n_examples
 
 
-def train(model, dataloader, optimizer, class_specific=False, coefs=None, log_writer: SummaryWriter = None,
+def train(model, dataloader, optimizer, config: Settings, log_writer: SummaryWriter = None,
           step: int = 0):
     assert (optimizer is not None)
 
     print('\ttrain')
     model.train()
-    return _train_or_test(model=model, dataloader=dataloader, optimizer=optimizer,
-                          class_specific=class_specific, coefs=coefs, log_writer=log_writer, step=step)
+    return _train_or_test(model=model, dataloader=dataloader, config=config, optimizer=optimizer,
+                          log_writer=log_writer, step=step)
 
 
-def test(model, dataloader, class_specific=False, log_writer: SummaryWriter = None, step: int = 0):
+def test(model, dataloader, config: Settings, log_writer: SummaryWriter = None, step: int = 0):
     print('\ttest')
     model.eval()
-    return _train_or_test(model=model, dataloader=dataloader, optimizer=None,
-                          class_specific=class_specific, log_writer=log_writer, step=step)
+    return _train_or_test(model=model, dataloader=dataloader, config=config, optimizer=None,
+                          log_writer=log_writer, step=step)
 
 
 def _freeze_layer(layer):
