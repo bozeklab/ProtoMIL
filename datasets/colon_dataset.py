@@ -290,7 +290,7 @@ class ColonCancerBagsCross(data_utils.Dataset):
     def transform_and_data_augmentation(self, bag, raw=False):
         if raw:
             img_transform = self.to_tensor_transform
-        elif self.data_augmentation:
+        elif not raw and self.data_augmentation:
             img_transform = self.data_augmentation_img_transform
         else:
             img_transform = self.normalize_to_tensor_transform
