@@ -1,8 +1,10 @@
 import os
+import random
 import subprocess
 from glob import glob
 from typing import Dict, Any, Optional, Tuple
 
+import numpy
 import torch
 
 from train_and_test import TrainMode
@@ -35,6 +37,9 @@ def save_train_state(file_path_prefix: str, model: torch.nn.Module, things_with_
             'experiment_run_name': experiment_run_name,
             'best_accu': best_accu,
             'current_push_best_accu': current_push_best_accu,
+            'torch_random': torch.random.get_rng_state(),
+            'numpy_random': numpy.random.get_state(),
+            'python_random': random.getstate(),
         }, new_file_path)
         # atomic on POSIX
         os.replace(new_file_path, file_path)
@@ -50,12 +55,17 @@ def get_state_path_for_prefix(file_path_prefix: str):
     return files
 
 
-def load_train_state(file_path: str, model: torch.nn.Module, things_with_state: Dict[str, Any]) -> \
+def load_train_state(file_path: str, model: torch.nn.Module, things_with_state: Dict[str, Any],
+                     restore_random_state: bool = True) -> \
         Tuple[int, TrainMode, int, Optional[int], str, float, Optional[float]]:
     data = torch.load(file_path)
     model.load_state_dict(data['model'])
     for name, obj in things_with_state.items():
         obj.load_state_dict(data['states'][name])
+    if restore_random_state and 'torch_random' in data:
+        torch.random.set_rng_state(data['torch_random'])
+        numpy.random.set_state(data['numpy_random'])
+        random.setstate(data['python_random'])
     return (data['step'],
             data['mode'],
             data['epoch'],

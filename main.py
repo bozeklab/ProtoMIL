@@ -2,16 +2,18 @@ import argparse
 import datetime
 import os
 import platform
+import random
 import sys
 
 import matplotlib
+import numpy
 import torch.utils.data
 from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
 
 from datasets.colon_dataset import ColonCancerBagsCross
 from datasets.mnist_dataset import MnistBags
-from helpers import makedir
+from helpers import makedir, str2bool
 from model import construct_PPNet
 from push import push_prototypes
 from save import load_train_state, save_train_state, get_state_path_for_prefix, snapshot_code
@@ -40,6 +42,7 @@ parser.add_argument('-n', '--new_experiment', default=False, action='store_true'
                     help='Overwrite any saved state and start a new experiment (saved checkpoint will be lost)')
 parser.add_argument('-l', '--load_state', metavar='STATE_FILE', type=str, default=None,
                     help='Continue training from specified state file (saved checkpoint will be lost)')
+parser.add_argument('--deterministic', type=str2bool, default=True, help='Use deterministic mode (slightly slower)')
 for param_name, param_type in Settings.as_params():
     parser.add_argument('--{}'.format(param_name), type=param_type)
 args = parser.parse_args()
@@ -51,27 +54,12 @@ if args.new_experiment and args.load_state:
 os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpuid)
 print('CUDA available:', torch.cuda.is_available())
 
-if args.dataset == 'colon_cancer':
-    split_val = 70
-    train_range, test_range = range(split_val), range(split_val, 100)
-
-    ds = ColonCancerBagsCross(path="data/ColonCancer", train=True, train_val_idxs=train_range, test_idxs=test_range,
-                              shuffle_bag=True, data_augmentation=True)
-    ds_push = ColonCancerBagsCross(path="data/ColonCancer", train=True, train_val_idxs=train_range,
-                                   test_idxs=test_range,
-                                   push=True, shuffle_bag=True)
-    ds_test = ColonCancerBagsCross(path="data/ColonCancer", train=False, train_val_idxs=train_range,
-                                   test_idxs=test_range)
-    config = COLON_CANCER_SETTINGS
-elif args.dataset == 'mnist':
-    ds = MnistBags(train=True)
-    ds_push = MnistBags(train=True, push=True)
-    ds_test = MnistBags(train=False)
-    config = MNIST_SETTINGS
-else:
-    raise NotImplementedError()
-
+config = {
+    'colon_cancer': COLON_CANCER_SETTINGS,
+    'mnist': COLON_CANCER_SETTINGS,
+}[args.dataset]
 config = config.new_from_params(args)
+print(config)
 
 if config.random_seed_value is not None:
     seed = config.random_seed_value
@@ -80,6 +68,37 @@ elif config.random_seed_id is not None:
 else:
     seed = torch.seed()
 torch.manual_seed(seed)
+numpy.random.seed(seed)
+random.seed(seed)
+print('Seed: {}'.format(seed))
+
+if args.deterministic:
+    # Make deterministic.
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    torch.set_deterministic(True)
+    print('Deterministic mode enabled.')
+else:
+    print('WARNING: proceeding with non-deterministic mode.')
+
+
+if args.dataset == 'colon_cancer':
+    split_val = 70
+    train_range, test_range = range(split_val), range(split_val, 100)
+    ds = ColonCancerBagsCross(path="data/ColonCancer", train=True, train_val_idxs=train_range, test_idxs=test_range,
+                              shuffle_bag=True, data_augmentation=True)
+    ds_push = ColonCancerBagsCross(path="data/ColonCancer", train=True, train_val_idxs=train_range,
+                                   test_idxs=test_range,
+                                   push=True, shuffle_bag=True)
+    ds_test = ColonCancerBagsCross(path="data/ColonCancer", train=False, train_val_idxs=train_range,
+                                   test_idxs=test_range)
+elif args.dataset == 'mnist':
+    ds = MnistBags(train=True)
+    ds_push = MnistBags(train=True, push=True)
+    ds_test = MnistBags(train=False)
+else:
+    raise NotImplementedError()
+
+print('Dataset loaded.')
 
 ppnet = construct_PPNet(base_architecture=config.base_architecture,
                         pretrained=False, img_size=config.img_size,
@@ -88,10 +107,6 @@ ppnet = construct_PPNet(base_architecture=config.base_architecture,
                         prototype_activation_function=config.prototype_activation_function,
                         add_on_layers_type=config.add_on_layers_type)
 ppnet = ppnet.cuda()
-
-print(config)
-
-print('Seed: {}'.format(seed))
 
 summary(ppnet, (10, 3, config.img_size, config.img_size), col_names=("input_size", "output_size", "num_params"))
 

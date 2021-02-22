@@ -94,7 +94,7 @@ MNIST_SETTINGS = Settings(
 COLON_CANCER_SETTINGS = Settings(
     base_architecture='resnet18_small',
     img_size=27,
-    prototype_shape=(20, 128, 2, 2),
+    prototype_shape=(10, 128, 2, 2),
     joint_optimizer_lrs={
         'features': 1e-4,
         'add_on_layers': 3e-3,
