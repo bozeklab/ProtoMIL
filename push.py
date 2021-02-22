@@ -10,10 +10,9 @@ from receptive_field import compute_rf_prototype
 
 
 # push each prototype to the nearest patch in the training set
-def push_prototypes(dataloader,  # pytorch dataloader (must be unnormalized in [0,1])
+def push_prototypes(push_dataloader,  # pytorch dataloader
                     prototype_network_parallel,  # pytorch network with prototype_vectors
                     class_specific=True,
-                    preprocess_input_function=None,  # normalize if needed
                     prototype_layer_stride=1,
                     root_dir_for_saving_prototypes=None,  # if not None, prototypes will be saved here
                     epoch_number=None,  # if not provided, prototypes saved previously will be overwritten
@@ -70,12 +69,13 @@ def push_prototypes(dataloader,  # pytorch dataloader (must be unnormalized in [
 
     start_index_of_search_batch = 0
 
-    for push_iter, (search_batch_input, search_y) in enumerate(dataloader):
+    for push_iter, (search_batch_raw, search_batch_preprocessed, search_y) in enumerate(push_dataloader):
         '''
         start_index_of_search keeps track of the index of the image
         assigned to serve as prototype
         '''
-        update_prototypes_on_batch(search_batch_input,
+        update_prototypes_on_batch(search_batch_raw,
+                                   search_batch_preprocessed,
                                    start_index_of_search_batch,
                                    prototype_network_parallel,
                                    global_min_proto_dist,
@@ -85,13 +85,11 @@ def push_prototypes(dataloader,  # pytorch dataloader (must be unnormalized in [
                                    class_specific=class_specific,
                                    search_y=search_y,
                                    num_classes=num_classes,
-                                   preprocess_input_function=preprocess_input_function,
                                    prototype_layer_stride=prototype_layer_stride,
                                    dir_for_saving_prototypes=proto_epoch_dir,
                                    prototype_img_filename_prefix=prototype_img_filename_prefix,
                                    prototype_self_act_filename_prefix=prototype_self_act_filename_prefix,
                                    prototype_activation_function_in_numpy=prototype_activation_function_in_numpy)
-        search_batch_input += search_batch_input.shape[0]
 
     if proto_epoch_dir != None and proto_bound_boxes_filename_prefix != None:
         np.save(os.path.join(proto_epoch_dir,
@@ -108,7 +106,8 @@ def push_prototypes(dataloader,  # pytorch dataloader (must be unnormalized in [
 
 
 # update each prototype for current search batch
-def update_prototypes_on_batch(search_batch_input,
+def update_prototypes_on_batch(search_batch_raw,
+                               search_batch_preprocessed,
                                start_index_of_search_batch,
                                prototype_network_parallel,
                                global_min_proto_dist,  # this will be updated
@@ -118,7 +117,6 @@ def update_prototypes_on_batch(search_batch_input,
                                class_specific=True,
                                search_y=None,  # required if class_specific == True
                                num_classes=None,  # required if class_specific == True
-                               preprocess_input_function=None,
                                prototype_layer_stride=1,
                                dir_for_saving_prototypes=None,
                                prototype_img_filename_prefix=None,
@@ -127,20 +125,12 @@ def update_prototypes_on_batch(search_batch_input,
     prototype_network_parallel.eval()
 
     # Use bag y as batch y
-    search_y = search_y.repeat(search_batch_input.shape[0])
-
-    if preprocess_input_function is not None:
-        # print('preprocessing input for pushing ...')
-        # search_batch = copy.deepcopy(search_batch_input)
-        search_batch = preprocess_input_function(search_batch_input)
-
-    else:
-        search_batch = search_batch_input
+    search_y = search_y.repeat(search_batch_raw.shape[0])
 
     with torch.no_grad():
-        search_batch = search_batch.cuda()
+        search_batch_preprocessed = search_batch_preprocessed.cuda()
         # this computation currently is not parallelized
-        protoL_input_torch, proto_dist_torch = prototype_network_parallel.push_forward(search_batch)
+        protoL_input_torch, proto_dist_torch = prototype_network_parallel.push_forward(search_batch_preprocessed)
 
     protoL_input_ = np.copy(protoL_input_torch.detach().cpu().numpy())
     proto_dist_ = np.copy(proto_dist_torch.detach().cpu().numpy())
@@ -206,10 +196,11 @@ def update_prototypes_on_batch(search_batch_input,
             # get the receptive field boundary of the image patch
             # that generates the representation
             protoL_rf_info = prototype_network_parallel.proto_layer_rf_info
-            rf_prototype_j = compute_rf_prototype(search_batch.size(2), batch_argmin_proto_dist_j, protoL_rf_info)
+            rf_prototype_j = compute_rf_prototype(search_batch_preprocessed.size(2), batch_argmin_proto_dist_j,
+                                                  protoL_rf_info)
 
             # get the whole image
-            original_img_j = search_batch_input[rf_prototype_j[0]]
+            original_img_j = search_batch_raw[rf_prototype_j[0]]
             original_img_j = original_img_j.numpy()
             original_img_j = np.transpose(original_img_j, (1, 2, 0))
             original_img_size = original_img_j.shape[0]

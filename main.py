@@ -2,6 +2,7 @@ import argparse
 import datetime
 import os
 import platform
+import sys
 
 import matplotlib
 import torch.utils.data
@@ -12,15 +13,18 @@ from datasets.colon_dataset import ColonCancerBagsCross
 from datasets.mnist_dataset import MnistBags
 from helpers import makedir
 from model import construct_PPNet
-from preprocess import preprocess_input_function
 from push import push_prototypes
 from save import load_train_state, save_train_state, get_state_path_for_prefix, snapshot_code
-from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS
+from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS, Settings
 from train_and_test import warm_only, train, joint, test, last_only, TrainMode
 
 matplotlib.use('Agg')
 
-DEBUG = False
+# detect debugger
+gettrace = getattr(sys, 'gettrace', None)
+DEBUG = gettrace is not None and gettrace()
+if DEBUG:
+    print('DEBUG MODE - parallelism disabled')
 
 CHECKPOINT_PREFIX = 'checkpoint'
 LOGS_DIR = 'runs'
@@ -39,6 +43,8 @@ parser.add_argument('-n', '--new_experiment', default=False, action='store_true'
                     help='Overwrite any saved state and start a new experiment (saved checkpoint will be lost)')
 parser.add_argument('-l', '--load_state', metavar='STATE_FILE', type=str, default=None,
                     help='Continue training from specified state file (saved checkpoint will be lost)')
+for param_name, param_type in Settings.as_params():
+    parser.add_argument('--{}'.format(param_name), type=param_type)
 args = parser.parse_args()
 
 if args.new_experiment and args.load_state:
@@ -62,11 +68,13 @@ if args.dataset == 'colon_cancer':
     config = COLON_CANCER_SETTINGS
 elif args.dataset == 'mnist':
     ds = MnistBags(train=True)
-    ds_push = MnistBags(train=True)
+    ds_push = MnistBags(train=True, push=True)
     ds_test = MnistBags(train=False)
     config = MNIST_SETTINGS
 else:
     raise NotImplementedError()
+
+config = config.new_from_params(args)
 
 ppnet = construct_PPNet(base_architecture=config.base_architecture,
                         pretrained=False, img_size=config.img_size,
@@ -75,6 +83,8 @@ ppnet = construct_PPNet(base_architecture=config.base_architecture,
                         prototype_activation_function=config.prototype_activation_function,
                         add_on_layers_type=config.add_on_layers_type)
 ppnet = ppnet.cuda()
+
+print(config)
 
 summary(ppnet, (10, 3, config.img_size, config.img_size), col_names=("input_size", "output_size", "num_params"))
 
@@ -162,7 +172,7 @@ if load_state_path:
     print('Best score so far: {}'.format(best_accu))
 else:
     step = 0
-    mode = TrainMode.WARM
+    mode = TrainMode.WARM if config.num_warm_epochs > 0 else TrainMode.JOINT
     epoch = 0
     iteration = None
     experiment_run_name = '{}.{}.{}'.format(args.dataset, platform.node(), datetime.datetime.now().isoformat())
@@ -183,8 +193,6 @@ weight_matrix_filename = 'outputL_weights'
 prototype_img_filename_prefix = 'prototype-img'
 prototype_self_act_filename_prefix = 'prototype-self-act'
 proto_bound_boxes_filename_prefix = 'bb'
-
-
 
 log_writer.add_text('seed', str(seed))
 
@@ -230,6 +238,9 @@ push_model_state_epoch = None
 while True:
     print('step: {}, mode: {}, epoch: {}, iteration: {}'.format(step, mode.name, epoch, iteration))
     if mode == TrainMode.WARM:
+        if ppnet.attention_enabled:
+            ppnet.attention_enabled = False
+            print('\tattention disabled')
         write_mode(TrainMode.WARM, log_writer, step)
         warm_only(model=ppnet)
         train(model=ppnet, dataloader=train_loader, optimizer=warm_optimizer,
@@ -271,6 +282,9 @@ while True:
                     class_specific=config.class_specific, log_writer=log_writer, step=step)
         push_model_state_epoch = epoch
         current_push_best_accu = 0.
+        if not ppnet.attention_enabled:
+            ppnet.attention_enabled = True
+            print('\tattention enabled')
         if config.prototype_activation_function != 'linear':
             mode = TrainMode.LAST_ONLY
             iteration = 0

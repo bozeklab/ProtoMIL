@@ -144,6 +144,8 @@ class PPNet(nn.Module):
         if init_weights:
             self._initialize_weights()
 
+        self.attention_enabled = True
+
     def conv_features(self, x):
         '''
         the feature input to prototype layer
@@ -235,11 +237,15 @@ class PPNet(nn.Module):
         # H = self.feature_extractor_part1(x)
         # H = H.view(-1, 50 * 4 * 4)
         # H = self.feature_extractor_part2(H)  # NxL
-        A_V = self.attention_V(prototype_activations)  # NxD
-        A_U = self.attention_U(prototype_activations)  # NxD
-        A = self.attention_weights(A_V * A_U)  # element wise multiplication # NxK
-        A = torch.transpose(A, 1, 0)  # KxN
-        A = F.softmax(A, dim=1)  # softmax over N
+        if self.attention_enabled:
+            A_V = self.attention_V(prototype_activations)  # NxD
+            A_U = self.attention_U(prototype_activations)  # NxD
+            A = self.attention_weights(A_V * A_U)  # element wise multiplication # NxK
+            A = torch.transpose(A, 1, 0)  # KxN
+            A = F.softmax(A, dim=1)  # softmax over N
+        else:
+            A = torch.ones((1, prototype_activations.shape[0]), device=prototype_activations.device) / \
+                prototype_activations.shape[0]
 
         M = torch.mm(A, prototype_activations)  # KxL
 

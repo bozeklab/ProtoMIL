@@ -36,7 +36,7 @@ class ColonCancerBagsCross(data_utils.Dataset):
         tst = [utils_augemntation.HistoNormalize(),
                transforms.ToTensor()
                ]
-        
+
         psh = [transforms.ToTensor()]
 
         self.data_augmentation_img_transform = transforms.Compose(tr)
@@ -287,8 +287,8 @@ class ColonCancerBagsCross(data_utils.Dataset):
 
         return bag_list, labels_list
 
-    def transform_and_data_augmentation(self, bag):
-        if self.push:
+    def transform_and_data_augmentation(self, bag, raw=False):
+        if raw:
             img_transform = self.to_tensor_transform
         elif self.data_augmentation:
             img_transform = self.data_augmentation_img_transform
@@ -304,7 +304,7 @@ class ColonCancerBagsCross(data_utils.Dataset):
                      )))
             else:
                 bag_tensors.append(img_transform(img))
-        
+
         return torch.stack(bag_tensors)
 
     def __len__(self):
@@ -320,5 +320,8 @@ class ColonCancerBagsCross(data_utils.Dataset):
         else:
             bag = self.bag_list_test[index]
             label = max(self.labels_list_test[index])
-
-        return self.transform_and_data_augmentation(bag), torch.LongTensor([int(label)])
+        if self.push:
+            return self.transform_and_data_augmentation(bag, raw=True), self.transform_and_data_augmentation(
+                bag), torch.LongTensor([int(label)])
+        else:
+            return self.transform_and_data_augmentation(bag), torch.LongTensor([int(label)])

@@ -1,8 +1,9 @@
+import dataclasses
 from dataclasses import dataclass
 from typing import Tuple, List
 
 
-@dataclass
+@dataclass(frozen=True)
 class Settings:
     base_architecture: str
     img_size: int
@@ -37,6 +38,25 @@ class Settings:
             'sep': self.coef_sep,
             'l1': self.coef_l1,
         }
+
+    @classmethod
+    def as_params(cls):
+        return [(field.name, field.type) for field in dataclasses.fields(cls) if field.type in {str, int, float, bool}]
+
+    def new_from_params(self, params):
+        fields = dict()
+        for field in dataclasses.fields(self):
+            field_name = field.name
+            if hasattr(params, field_name) and getattr(params, field_name) is not None:
+                fields[field_name] = getattr(params, field_name)
+            else:
+                fields[field_name] = getattr(self, field_name)
+        return Settings(**fields)
+
+    def __str__(self):
+        return 'Settings:\n' + '\n'.join(
+            '\t{name}: {value}'.format(name=field.name, value=getattr(self, field.name)) for field in
+            dataclasses.fields(self))
 
 
 MNIST_SETTINGS = Settings(
@@ -86,5 +106,5 @@ COLON_CANCER_SETTINGS = Settings(
     num_warm_epochs=5,
     num_last_layer_iterations=20,
     push_start=10,
-    push_epochs=[i for i in range(1000) if i % 10 == 0]
+    push_epochs=[i for i in range(200) if i % 10 == 0]
 )

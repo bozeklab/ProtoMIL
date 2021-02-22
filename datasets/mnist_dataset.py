@@ -7,13 +7,15 @@ from torchvision import datasets, transforms
 
 
 class MnistBags(data_utils.Dataset):
-    def __init__(self, target_number=9, mean_bag_length=10, var_bag_length=1, num_bag=1000, seed=7, train=True):
+    def __init__(self, target_number=9, mean_bag_length=10, var_bag_length=1, num_bag=1000, seed=7, train=True,
+                 push=False):
         self.target_number = target_number
         self.mean_bag_length = mean_bag_length
         self.var_bag_length = var_bag_length
         self.num_bag = num_bag
         self.seed = seed
         self.train = train
+        self.push = push
 
         self.r = np.random.RandomState(seed)
 
@@ -150,4 +152,7 @@ class MnistBags(data_utils.Dataset):
             bag = self.test_bags_list[index]
             label = torch.LongTensor([max(self.test_labels_list[index])])
 
-        return bag, label
+        if self.push:
+            return bag, bag, label
+        else:
+            return bag, label
