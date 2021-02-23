@@ -80,7 +80,6 @@ if args.deterministic:
 else:
     print('WARNING: proceeding with non-deterministic mode.')
 
-
 if args.dataset == 'colon_cancer':
     split_val = 70
     train_range, test_range = range(split_val), range(split_val, 100)
@@ -183,6 +182,8 @@ elif not args.new_experiment and len(checkpoint_files) > 0:
     load_state_path = checkpoint_files[0]
 if load_state_path:
     print('Loading state from: {}'.format(load_state_path))
+    if args.deterministic:
+        print('WARNING: resuming from saved state is not fully deterministic!')
     (step,
      mode,
      epoch,
@@ -216,8 +217,6 @@ prototype_img_filename_prefix = 'prototype-img'
 prototype_self_act_filename_prefix = 'prototype-self-act'
 proto_bound_boxes_filename_prefix = 'bb'
 
-log_writer.add_text('seed', str(seed))
-
 workers = 0 if DEBUG else 8
 
 train_loader = torch.utils.data.DataLoader(
@@ -236,7 +235,14 @@ test_loader = torch.utils.data.DataLoader(
 # noinspection PyTypeChecker
 log_writer.add_text('dataset_stats',
                     'training set size: {}, push set size: {}, test set size: {}'.format(
-                        len(train_loader.dataset), len(train_push_loader.dataset), len(test_loader.dataset)))
+                        len(train_loader.dataset), len(train_push_loader.dataset), len(test_loader.dataset)),
+                    global_step=step)
+log_writer.add_text('seed', str(seed), global_step=step)
+config_md = '\n'.join(
+    ('* ' + x) if idx != 0 else x + '\n' for idx, x in enumerate(str(config).splitlines(keepends=False)))
+log_writer.add_text('settings', config_md, global_step=step)
+if step == 0:
+    log_writer.add_graph(ppnet, next(iter(train_loader))[0].cuda())
 
 # if prototype_activation_function == 'linear':
 #    ppnet.set_last_layer_incorrect_connection(incorrect_strength=0)
