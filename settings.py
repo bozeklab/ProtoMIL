@@ -94,7 +94,8 @@ MNIST_SETTINGS = Settings(
 COLON_CANCER_SETTINGS = Settings(
     base_architecture='resnet18_small',
     img_size=27,
-    prototype_shape=(10, 128, 2, 2),
+    prototype_shape=(20, 128, 2, 2),
+    loss_function='focal',
     joint_optimizer_lrs={
         'features': 1e-4,
         'add_on_layers': 3e-3,
@@ -109,7 +110,7 @@ COLON_CANCER_SETTINGS = Settings(
         'attention': 1e-3,
         'last_layer': 1e-4,
     },
-    num_train_epochs=101,
+    num_train_epochs=51,
     num_warm_epochs=5,
     num_last_layer_iterations=20,
     push_start=10,

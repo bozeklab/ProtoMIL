@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import getpass
 import os
 import platform
 import random
@@ -169,7 +170,7 @@ other_state = {
     'last_layer_optimizer': last_layer_optimizer,
 }
 
-checkpoint_file_prefix = '{}.{}'.format(CHECKPOINT_PREFIX, args.dataset)
+checkpoint_file_prefix = '{}.{}.{}'.format(CHECKPOINT_PREFIX, args.dataset, getpass.getuser())
 checkpoint_files = get_state_path_for_prefix(checkpoint_file_prefix)
 load_state_path = None
 if args.load_state:

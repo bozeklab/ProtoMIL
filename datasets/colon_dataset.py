@@ -63,8 +63,8 @@ class ColonCancerBagsCross(data_utils.Dataset):
         dirs.pop(0)
         dirs.sort()
 
-        dir_list_train = [dirs[i] for i in train_val_idxs]
-        dir_list_test = [dirs[i] for i in test_idxs]
+        dir_list_train = list(sorted([dirs[i] for i in train_val_idxs]))
+        dir_list_test = list(sorted([dirs[i] for i in test_idxs]))
 
         return dir_list_train, dir_list_test
 
