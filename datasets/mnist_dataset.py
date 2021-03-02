@@ -9,7 +9,7 @@ from torchvision import datasets, transforms
 
 class MnistBags(data_utils.Dataset):
     def __init__(self, target_number=9, mean_bag_length=200, var_bag_length=150, min_bag_size=50, max_bag_size=600,
-                 train_num_bag=1000, test_num_bags=100, seed=7, train=True,
+                 train_num_bag=1000, test_num_bags=500, seed=7, train=True,
                  push=False):
         self.target_number = target_number
         self.mean_bag_length = mean_bag_length
