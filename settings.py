@@ -88,7 +88,7 @@ MNIST_SETTINGS = Settings(
     num_warm_epochs=5,
     num_last_layer_iterations=20,
     push_start=10,
-    push_epochs=[i for i in range(1000) if i % 10 == 0]
+    push_epochs=[i for i in range(200) if i % 10 == 0]
 )
 
 COLON_CANCER_SETTINGS = Settings(
