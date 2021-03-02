@@ -299,7 +299,7 @@ class ColonCancerBagsCross(data_utils.Dataset):
         for img in bag:
             if self.location_info:
                 bag_tensors.append(torch.cat(
-                    (img_transform(img[:, :, :3]),
+                    (img_transform(img[:, :, :3].astype('uint8')),
                      torch.from_numpy(img[:, :, 3:].astype(float).transpose((2, 0, 1))).float(),
                      )))
             else:
