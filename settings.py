@@ -7,7 +7,9 @@ from typing import Tuple, List, Optional
 class Settings:
     base_architecture: str
     img_size: int
-    prototype_shape: Tuple[int, int, int, int]
+    prototype_number: int
+    prototype_latent: int
+    prototype_conv_dim: Tuple[int, int]
 
     joint_optimizer_lrs: dict
     joint_lr_step_size: int
@@ -47,6 +49,10 @@ class Settings:
             'l1': self.coef_l1,
         }
 
+    @property
+    def prototype_shape(self):
+        return self.prototype_number, self.prototype_latent, *self.prototype_conv_dim
+
     @classmethod
     def as_params(cls):
         return [(field.name, field.type) for field in dataclasses.fields(cls) if field.type in {str, int, float, bool}]
@@ -70,7 +76,9 @@ class Settings:
 MNIST_SETTINGS = Settings(
     base_architecture='resnet18_small',
     img_size=28,
-    prototype_shape=(10, 128, 2, 2),
+    prototype_number=10,
+    prototype_latent=128,
+    prototype_conv_dim=(2, 2),
     joint_optimizer_lrs={
         'features': 1e-4,
         'add_on_layers': 3e-3,
@@ -95,7 +103,9 @@ MNIST_SETTINGS = Settings(
 COLON_CANCER_SETTINGS = Settings(
     base_architecture='resnet18_small',
     img_size=27,
-    prototype_shape=(20, 128, 2, 2),
+    prototype_number=20,
+    prototype_latent=128,
+    prototype_conv_dim=(2, 2),
     loss_function='focal',
     joint_optimizer_lrs={
         'features': 1e-4,
