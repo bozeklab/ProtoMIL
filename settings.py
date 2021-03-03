@@ -30,6 +30,7 @@ class Settings:
     add_on_layers_type: str = 'regular'
     loss_function: str = 'cross_entropy'
     class_specific: bool = True
+    batch_norm_features: bool = False
 
     random_seed_presets: List[int] = dataclasses.field(
         default_factory=lambda: [631056511, 923928841, 53306087, 937272127, 207121037])

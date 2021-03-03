@@ -105,10 +105,12 @@ ppnet = construct_PPNet(base_architecture=config.base_architecture,
                         prototype_shape=config.prototype_shape,
                         num_classes=config.num_classes,
                         prototype_activation_function=config.prototype_activation_function,
-                        add_on_layers_type=config.add_on_layers_type)
+                        add_on_layers_type=config.add_on_layers_type,
+                        batch_norm_features=config.batch_norm_features)
 ppnet = ppnet.cuda()
 
-summary(ppnet, (10, 3, config.img_size, config.img_size), col_names=("input_size", "output_size", "num_params"))
+summary(ppnet, (10, 3, config.img_size, config.img_size), col_names=("input_size", "output_size", "num_params"),
+        depth=4)
 
 joint_optimizer_specs = [
     {
@@ -223,15 +225,15 @@ workers = 0 if DEBUG else 8
 train_loader = torch.utils.data.DataLoader(
     ds, batch_size=None, shuffle=True,
     num_workers=workers,
-    pin_memory=True)
+    pin_memory=False)
 train_push_loader = torch.utils.data.DataLoader(
     ds_push, batch_size=None, shuffle=False,
     num_workers=workers,
-    pin_memory=True)
+    pin_memory=False)
 test_loader = torch.utils.data.DataLoader(
     ds_test, batch_size=None, shuffle=False,
     num_workers=workers,
-    pin_memory=True)
+    pin_memory=False)
 
 # noinspection PyTypeChecker
 log_writer.add_text('dataset_stats',
