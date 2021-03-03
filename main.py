@@ -57,7 +57,7 @@ print('CUDA available:', torch.cuda.is_available())
 
 config = {
     'colon_cancer': COLON_CANCER_SETTINGS,
-    'mnist': COLON_CANCER_SETTINGS,
+    'mnist': MNIST_SETTINGS,
 }[args.dataset]
 config = config.new_from_params(args)
 print(config)
