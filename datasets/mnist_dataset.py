@@ -9,6 +9,7 @@ from torchvision import datasets, transforms
 
 class MnistBags(data_utils.Dataset):
     def __init__(self, target_number=9, mean_bag_length=200, var_bag_length=150, min_bag_size=50, max_bag_size=600,
+                 target_numbers_in_pos_bag_mean=0.3, target_numbers_in_pos_bag_std=0.25,
                  train_num_bag=1000, test_num_bags=500, seed=7, train=True,
                  push=False):
         self.target_number = target_number
@@ -22,8 +23,8 @@ class MnistBags(data_utils.Dataset):
         self.min_bag_size = min_bag_size
         self.max_bag_size = max_bag_size
 
-        self.target_numbers_in_pos_bag_mean = 0.3
-        self.target_numbers_in_pos_bag_std = 0.25
+        self.target_numbers_in_pos_bag_mean = target_numbers_in_pos_bag_mean
+        self.target_numbers_in_pos_bag_std = target_numbers_in_pos_bag_std
 
         self.r = np.random.RandomState(seed)
 
