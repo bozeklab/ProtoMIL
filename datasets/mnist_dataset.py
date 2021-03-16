@@ -8,23 +8,23 @@ from torchvision import datasets, transforms
 
 
 class MnistBags(data_utils.Dataset):
-    def __init__(self, target_number=9, mean_bag_length=200, var_bag_length=150, min_bag_size=50, max_bag_size=600,
-                 target_numbers_in_pos_bag_mean=0.3, target_numbers_in_pos_bag_std=0.25,
-                 train_num_bag=1000, test_num_bags=500, seed=7, train=True,
+    def __init__(self, target_number=9, bag_length_mean=200, bag_length_std=150, bag_length_min=50, bag_length_max=600,
+                 positive_samples_in_bag_ratio_mean=0.3, positive_samples_in_bag_ratio_std=0.25,
+                 num_bags_train=1000, num_bags_test=500, seed=7, train=True,
                  push=False):
         self.target_number = target_number
-        self.mean_bag_length = mean_bag_length
-        self.var_bag_length = var_bag_length
-        self.num_bag = train_num_bag if train else test_num_bags
+        self.mean_bag_length = bag_length_mean
+        self.var_bag_length = bag_length_std
+        self.num_bag = num_bags_train if train else num_bags_test
         self.seed = seed
         self.train = train
         self.push = push
         self.negative_bags = self.num_bag // 2
-        self.min_bag_size = min_bag_size
-        self.max_bag_size = max_bag_size
+        self.min_bag_size = bag_length_min
+        self.max_bag_size = bag_length_max
 
-        self.target_numbers_in_pos_bag_mean = target_numbers_in_pos_bag_mean
-        self.target_numbers_in_pos_bag_std = target_numbers_in_pos_bag_std
+        self.target_numbers_in_pos_bag_mean = positive_samples_in_bag_ratio_mean
+        self.target_numbers_in_pos_bag_std = positive_samples_in_bag_ratio_std
 
         self.r = np.random.RandomState(seed)
 

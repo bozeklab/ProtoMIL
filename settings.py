@@ -35,6 +35,16 @@ class Settings:
     batch_norm_features: bool = False
     mil_pooling: str = 'gated_attention'
 
+    # currently used only by mnist dataloader.
+    bag_length_mean: int = 200
+    bag_length_std: int = 150
+    bag_length_min: int = 50
+    bag_length_max: int = 600
+    num_bags_train: int = 1000
+    num_bags_test: int = 500
+    positive_samples_in_bag_ratio_mean: float = 0.3
+    positive_samples_in_bag_ratio_std: float = 0.25
+
     random_seed_presets: List[int] = dataclasses.field(
         default_factory=lambda: [631056511, 923928841, 53306087, 937272127, 207121037])
     random_seed_id: int = 0
@@ -53,6 +63,19 @@ class Settings:
     @property
     def prototype_shape(self):
         return self.prototype_number, self.prototype_latent, *self.prototype_conv_dim
+
+    @property
+    def dataset_settings(self):
+        return {
+            'bag_length_mean': self.bag_length_mean,
+            'bag_length_std': self.bag_length_std,
+            'bag_length_min': self.bag_length_min,
+            'bag_length_max': self.bag_length_max,
+            'positive_samples_in_bag_ratio_mean': self.positive_samples_in_bag_ratio_mean,
+            'positive_samples_in_bag_ratio_std': self.positive_samples_in_bag_ratio_std,
+            'num_bags_train': self.num_bags_train,
+            'num_bags_test': self.num_bags_test,
+        }
 
     @classmethod
     def as_params(cls):

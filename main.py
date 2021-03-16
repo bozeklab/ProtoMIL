@@ -92,9 +92,9 @@ if args.dataset == 'colon_cancer':
     ds_test = ColonCancerBagsCross(path="data/ColonCancer", train=False, train_val_idxs=train_range,
                                    test_idxs=test_range)
 elif args.dataset == 'mnist':
-    ds = MnistBags(train=True)
-    ds_push = MnistBags(train=True, push=True)
-    ds_test = MnistBags(train=False)
+    ds = MnistBags(train=True, seed=seed, **config.dataset_settings)
+    ds_push = MnistBags(train=True, push=True, seed=seed, **config.dataset_settings)
+    ds_test = MnistBags(train=False, seed=seed, **config.dataset_settings)
 else:
     raise NotImplementedError()
 
