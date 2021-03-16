@@ -64,7 +64,7 @@ print(config)
 
 if config.random_seed_value is not None:
     seed = config.random_seed_value
-elif config.random_seed_id is not None:
+elif config.random_seed_id is not None and config.random_seed_id >= 0:
     seed = config.random_seed_presets[config.random_seed_id]
 else:
     seed = torch.seed()
@@ -106,7 +106,8 @@ ppnet = construct_PPNet(base_architecture=config.base_architecture,
                         num_classes=config.num_classes,
                         prototype_activation_function=config.prototype_activation_function,
                         add_on_layers_type=config.add_on_layers_type,
-                        batch_norm_features=config.batch_norm_features)
+                        batch_norm_features=config.batch_norm_features,
+                        mil_pooling=config.mil_pooling)
 ppnet = ppnet.cuda()
 
 summary(ppnet, (10, 3, config.img_size, config.img_size), col_names=("input_size", "output_size", "num_params"),
@@ -269,8 +270,8 @@ push_model_state_epoch = None
 while True:
     print('step: {}, mode: {}, epoch: {}, iteration: {}'.format(step, mode.name, epoch, iteration))
     if mode == TrainMode.WARM:
-        if ppnet.attention_enabled:
-            ppnet.attention_enabled = False
+        if ppnet.mil_pooling == 'gated_attention':
+            ppnet.mil_pooling = 'average'
             print('\tattention disabled')
         write_mode(TrainMode.WARM, log_writer, step)
         warm_only(model=ppnet)
@@ -310,8 +311,8 @@ while True:
         accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step)
         push_model_state_epoch = epoch
         current_push_best_accu = 0.
-        if not ppnet.attention_enabled:
-            ppnet.attention_enabled = True
+        if config.mil_pooling == 'gated_attention' and not ppnet.mil_pooling == 'gated_attention':
+            ppnet.mil_pooling = 'gated_attention'
             print('\tattention enabled')
         if config.prototype_activation_function != 'linear':
             mode = TrainMode.LAST_ONLY

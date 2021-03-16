@@ -2,8 +2,9 @@ from enum import Enum
 
 import numpy as np
 import torch
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_auc_score
 from torch.utils.tensorboard import SummaryWriter
+import torch.nn.functional as func
 
 from focalloss import FocalLoss
 from helpers import list_of_distances
@@ -35,6 +36,8 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     total_avg_separation_cost = 0
     total_loss = 0
     conf_matrix = np.zeros((2, 2), dtype='int32')
+    preds = []
+    targets = []
 
     if config.loss_function == 'cross_entropy':
         loss_fn = torch.nn.CrossEntropyLoss()
@@ -93,6 +96,10 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
             n_examples += target.size(0)
             n_correct += (predicted == target).sum().item()
 
+            pred_s = func.softmax(output, dim=-1)
+            preds.append(pred_s.data.cpu().numpy())
+            targets.append(target.cpu().numpy())
+
             conf_matrix += confusion_matrix(target.cpu().numpy(), predicted.cpu().numpy(), labels=[0, 1])
 
             n_batches += 1
@@ -129,7 +136,12 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     total_separation_cost /= n_batches
     total_loss /= n_batches
 
+    preds = np.concatenate(preds)
+    targets = np.concatenate(targets)
+    auc = roc_auc_score(targets, preds[..., 1])
+
     print('\t\taccuracy:', n_correct / n_examples)
+    print('\t\tauc:', auc)
     print('\t\ttotal_loss:', total_loss)
 
     suffix = '/train' if is_train else '/test'
@@ -145,6 +157,7 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
                                   global_step=step)
 
         log_writer.add_scalar('accuracy' + suffix, n_correct / n_examples, global_step=step)
+        log_writer.add_scalar('auc' + suffix, auc, global_step=step)
         log_writer.add_scalar('l1' + suffix, model.last_layer.weight.norm(p=1).item(), global_step=step)
         conf_plot = ConfusionMatrixDisplay(confusion_matrix=conf_matrix).plot(cmap='Blues', values_format='d')
         log_writer.add_figure('confusion_matrix' + suffix, conf_plot.figure_, global_step=step, close=True)

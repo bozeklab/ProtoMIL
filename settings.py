@@ -33,10 +33,11 @@ class Settings:
     loss_function: str = 'cross_entropy'
     class_specific: bool = True
     batch_norm_features: bool = False
+    mil_pooling: str = 'gated_attention'
 
     random_seed_presets: List[int] = dataclasses.field(
         default_factory=lambda: [631056511, 923928841, 53306087, 937272127, 207121037])
-    random_seed_id: Optional[int] = 0
+    random_seed_id: int = 0
     # overrides random seed preset and id.
     random_seed_value = None
 

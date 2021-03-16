@@ -40,7 +40,7 @@ class PPNet(nn.Module):
     def __init__(self, features, img_size, prototype_shape,
                  proto_layer_rf_info, num_classes, init_weights=True,
                  prototype_activation_function='log',
-                 add_on_layers_type='bottleneck'):
+                 add_on_layers_type='bottleneck', mil_pooling='gated_attention'):
 
         super(PPNet, self).__init__()
         self.img_size = img_size
@@ -144,7 +144,7 @@ class PPNet(nn.Module):
         if init_weights:
             self._initialize_weights()
 
-        self.attention_enabled = True
+        self.mil_pooling = mil_pooling
 
     def conv_features(self, x):
         '''
@@ -232,29 +232,23 @@ class PPNet(nn.Module):
         min_distances = min_distances.view(-1, self.num_prototypes)
         prototype_activations = self.distance_2_similarity(min_distances)
 
-        # x = x.squeeze(0)
-
-        # H = self.feature_extractor_part1(x)
-        # H = H.view(-1, 50 * 4 * 4)
-        # H = self.feature_extractor_part2(H)  # NxL
-        if self.attention_enabled:
+        if self.mil_pooling == 'gated_attention':
             A_V = self.attention_V(prototype_activations)  # NxD
             A_U = self.attention_U(prototype_activations)  # NxD
             A = self.attention_weights(A_V * A_U)  # element wise multiplication # NxK
             A = torch.transpose(A, 1, 0)  # KxN
             A = F.softmax(A, dim=1)  # softmax over N
+            M = torch.mm(A, prototype_activations)  # KxL
+        elif self.mil_pooling == 'average':
+            M = torch.mean(prototype_activations, dim=0, keepdim=True)
+        elif self.mil_pooling == 'max':
+            M = torch.amax(prototype_activations, dim=0, keepdim=True)
+        elif self.mil_pooling == 'min':
+            M = torch.amin(prototype_activations, dim=0, keepdim=True)
         else:
-            A = torch.ones((1, prototype_activations.shape[0]), device=prototype_activations.device) / \
-                prototype_activations.shape[0]
+            raise NotImplementedError()
 
-        M = torch.mm(A, prototype_activations)  # KxL
-
-        # Y_prob = self.classifier(M)
-        # Y_hat = torch.ge(Y_prob, 0.5).float()
-
-        # logits = self.last_layer(prototype_activations)
         logits = self.last_layer(M)
-        # logits = torch.sigmoid(self.last_layer(M))
 
         return logits, min_distances
 
@@ -348,7 +342,7 @@ def construct_PPNet(base_architecture, pretrained=True, img_size=224,
                     prototype_shape=(2000, 512, 1, 1), num_classes=200,
                     prototype_activation_function='log',
                     add_on_layers_type='bottleneck',
-                    batch_norm_features=True):
+                    batch_norm_features=True, mil_pooling='gated_attention'):
     features = base_architecture_to_features[base_architecture](pretrained=pretrained, batch_norm=batch_norm_features)
     layer_filter_sizes, layer_strides, layer_paddings = features.conv_info()
     proto_layer_rf_info = compute_proto_layer_rf_info_v2(img_size=img_size,
@@ -363,4 +357,5 @@ def construct_PPNet(base_architecture, pretrained=True, img_size=224,
                  num_classes=num_classes,
                  init_weights=True,
                  prototype_activation_function=prototype_activation_function,
-                 add_on_layers_type=add_on_layers_type)
+                 add_on_layers_type=add_on_layers_type,
+                 mil_pooling=mil_pooling)
