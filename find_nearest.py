@@ -132,13 +132,13 @@ def find_k_nearest_patches_to_prototypes(dataloader,  # pytorch dataloader (must
 
                     # construct the closest patch object
                     closest_patch = ImagePatch(patch=closest_patch,
-                                               label=search_y[img_idx],
+                                               label=search_y[0],
                                                distance=closest_patch_distance_to_prototype_j,
                                                original_img=original_img,
                                                act_pattern=act_pattern,
                                                patch_indices=patch_indices)
                 else:
-                    closest_patch = ImagePatchInfo(label=search_y[img_idx],
+                    closest_patch = ImagePatchInfo(label=search_y[0],
                                                    distance=closest_patch_distance_to_prototype_j)
 
                 # add to the j-th heap
