@@ -218,7 +218,7 @@ class PPNet(nn.Module):
         else:
             raise NotImplementedError()
 
-    def forward(self, x):
+    def forward_(self, x):
         # x = x.squeeze(0)
         distances = self.prototype_distances(x)
         '''
@@ -232,6 +232,7 @@ class PPNet(nn.Module):
         min_distances = min_distances.view(-1, self.num_prototypes)
         prototype_activations = self.distance_2_similarity(min_distances)
 
+        A = torch.ones((1, prototype_activations.shape[0])) / prototype_activations.shape[0]
         if self.mil_pooling == 'gated_attention':
             A_V = self.attention_V(prototype_activations)  # NxD
             A_U = self.attention_U(prototype_activations)  # NxD
@@ -250,6 +251,10 @@ class PPNet(nn.Module):
 
         logits = self.last_layer(M)
 
+        return logits, min_distances, A, prototype_activations
+
+    def forward(self, x):
+        logits, min_distances, _, _ = self.forward_(x)
         return logits, min_distances
 
     def push_forward(self, x):

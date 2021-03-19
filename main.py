@@ -12,6 +12,7 @@ import torch.utils.data
 from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
 
+from analysis import generate_prototype_activation_matrix
 from datasets.colon_dataset import ColonCancerBagsCross
 from datasets.mnist_dataset import MnistBags
 from helpers import makedir, str2bool
@@ -329,6 +330,8 @@ while True:
         iteration += 1
         push_model_state_epoch = epoch
         if iteration >= config.num_last_layer_iterations:
+            generate_prototype_activation_matrix(ppnet, test_loader, train_push_loader, epoch, model_dir,
+                                                 torch.device('cuda'), log_writer, step)
             iteration = None
             epoch += 1
             mode = TrainMode.JOINT

@@ -49,26 +49,26 @@ class ImagePatchInfo:
 
 # find the nearest patches in the dataset to each prototype
 def find_k_nearest_patches_to_prototypes(dataloader,  # pytorch dataloader (must be unnormalized in [0,1])
-                                         prototype_network_parallel,  # pytorch network with prototype_vectors
+                                         ppnet,  # pytorch network with prototype_vectors
                                          k=5,
                                          preprocess_input_function=None,  # normalize if needed
                                          full_save=False,  # save all the images
                                          root_dir_for_saving_images='./nearest',
                                          log=print,
                                          prototype_activation_function_in_numpy=None):
-    prototype_network_parallel.eval()
+    ppnet.eval()
     '''
     full_save=False will only return the class identity of the closest
     patches, but it will not save anything.
     '''
-    log('find nearest patches')
+    print('        find nearest patches')
     start = time.time()
-    n_prototypes = prototype_network_parallel.module.num_prototypes
+    n_prototypes = ppnet.num_prototypes
 
-    prototype_shape = prototype_network_parallel.module.prototype_shape
+    prototype_shape = ppnet.prototype_shape
     max_dist = prototype_shape[1] * prototype_shape[2] * prototype_shape[3]
 
-    protoL_rf_info = prototype_network_parallel.module.proto_layer_rf_info
+    protoL_rf_info = ppnet.proto_layer_rf_info
 
     heaps = []
     # allocate an array of n_prototypes number of heaps
@@ -76,20 +76,11 @@ def find_k_nearest_patches_to_prototypes(dataloader,  # pytorch dataloader (must
         # a heap in python is just a maintained list
         heaps.append([])
 
-    for idx, (search_batch_input, search_y) in enumerate(dataloader):
-        print('batch {}'.format(idx))
-        if preprocess_input_function is not None:
-            # print('preprocessing input for pushing ...')
-            # search_batch = copy.deepcopy(search_batch_input)
-            search_batch = preprocess_input_function(search_batch_input)
-
-        else:
-            search_batch = search_batch_input
-
+    for idx, (search_batch_raw, search_batch, search_y) in enumerate(dataloader):
         with torch.no_grad():
             search_batch = search_batch.cuda()
             protoL_input_torch, proto_dist_torch = \
-                prototype_network_parallel.module.push_forward(search_batch)
+                ppnet.push_forward(search_batch)
 
         # protoL_input_ = np.copy(protoL_input_torch.detach().cpu().numpy())
         proto_dist_ = np.copy(proto_dist_torch.detach().cpu().numpy())
@@ -110,19 +101,19 @@ def find_k_nearest_patches_to_prototypes(dataloader,  # pytorch dataloader (must
                                              closest_patch_indices_in_distance_map_j,
                                              protoL_rf_info)
                     closest_patch = \
-                        search_batch_input[img_idx, :,
+                        search_batch_raw[img_idx, :,
                         closest_patch_indices_in_img[1]:closest_patch_indices_in_img[2],
                         closest_patch_indices_in_img[3]:closest_patch_indices_in_img[4]]
                     closest_patch = closest_patch.numpy()
                     closest_patch = np.transpose(closest_patch, (1, 2, 0))
 
-                    original_img = search_batch_input[img_idx].numpy()
+                    original_img = search_batch_raw[img_idx].numpy()
                     original_img = np.transpose(original_img, (1, 2, 0))
 
-                    if prototype_network_parallel.module.prototype_activation_function == 'log':
+                    if ppnet.prototype_activation_function == 'log':
                         act_pattern = np.log(
-                            (distance_map[j] + 1) / (distance_map[j] + prototype_network_parallel.module.epsilon))
-                    elif prototype_network_parallel.module.prototype_activation_function == 'linear':
+                            (distance_map[j] + 1) / (distance_map[j] + ppnet.epsilon))
+                    elif ppnet.prototype_activation_function == 'linear':
                         act_pattern = max_dist - distance_map[j]
                     else:
                         act_pattern = prototype_activation_function_in_numpy(distance_map[j])
@@ -246,6 +237,6 @@ def find_k_nearest_patches_to_prototypes(dataloader,  # pytorch dataloader (must
                 labels_all_prototype)
 
     end = time.time()
-    log('\tfind nearest patches time: \t{0}'.format(end - start))
+    log('        find nearest patches time: \t{0}'.format(end - start))
 
     return labels_all_prototype
