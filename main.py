@@ -45,6 +45,7 @@ parser.add_argument('-n', '--new_experiment', default=False, action='store_true'
                     help='Overwrite any saved state and start a new experiment (saved checkpoint will be lost)')
 parser.add_argument('-l', '--load_state', metavar='STATE_FILE', type=str, default=None,
                     help='Continue training from specified state file (saved checkpoint will be lost)')
+parser.add_argument('-c', '--run_name_prefix', type=str, default=None, help='Prefix for the experiment name')
 parser.add_argument('--deterministic', type=str2bool, default=True, help='Use deterministic mode (slightly slower)')
 for param_name, param_type in Settings.as_params():
     parser.add_argument('--{}'.format(param_name), type=param_type)
@@ -73,6 +74,7 @@ if load_state_path:
         print('WARNING: resuming from saved state is not fully deterministic!')
     config = load_config_from_train_state(load_state_path)
 if config is None:
+    print('Using default base settings for', args.dataset)
     config = {
         'colon_cancer': COLON_CANCER_SETTINGS,
         'mnist': MNIST_SETTINGS,
@@ -212,7 +214,12 @@ else:
     mode = TrainMode.WARM if config.num_warm_epochs > 0 else TrainMode.JOINT
     epoch = 0
     iteration = None
-    experiment_run_name = '{}.{}.{}'.format(args.dataset, platform.node(), datetime.datetime.now().isoformat())
+    run_name_prefix = ''
+    if args.run_name_prefix:
+        run_name_prefix = args.run_name_prefix.lower().replace(' ', '_') + '.'
+    time = datetime.datetime.now()
+    time = time.replace(microsecond=0)
+    experiment_run_name = run_name_prefix + '{}.{}.{}'.format(args.dataset, platform.node(), time.isoformat())
     best_accu = 0.
     current_push_best_accu = 0.
     print('Starting new experiment: {}'.format(experiment_run_name))
