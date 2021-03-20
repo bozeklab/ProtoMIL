@@ -4,14 +4,15 @@ import numpy as np
 import torch
 import torch.utils.data as data_utils
 from PIL import Image
+from sklearn.model_selection import KFold
+from torch.utils.data import ConcatDataset
 from torchvision import datasets, transforms
 
 
 class MnistBags(data_utils.Dataset):
     def __init__(self, target_number=9, bag_length_mean=200, bag_length_std=150, bag_length_min=50, bag_length_max=600,
                  positive_samples_in_bag_ratio_mean=0.3, positive_samples_in_bag_ratio_std=0.25,
-                 num_bags_train=1000, num_bags_test=500, seed=7, train=True,
-                 push=False):
+                 num_bags_train=1000, num_bags_test=500, seed=7, folds=10, fold_id=0, train=True, push=False):
         self.target_number = target_number
         self.mean_bag_length = bag_length_mean
         self.var_bag_length = bag_length_std
@@ -22,6 +23,8 @@ class MnistBags(data_utils.Dataset):
         self.negative_bags = self.num_bag // 2
         self.min_bag_size = bag_length_min
         self.max_bag_size = bag_length_max
+        self.folds = folds
+        self.fold_id = fold_id
 
         self.target_numbers_in_pos_bag_mean = positive_samples_in_bag_ratio_mean
         self.target_numbers_in_pos_bag_std = positive_samples_in_bag_ratio_std
@@ -37,25 +40,24 @@ class MnistBags(data_utils.Dataset):
             # transforms.Normalize((0.1307,), (0.3081,)),
         ])
 
-        if self.train:
-            self.bags_list, self.labels_list = self._form_bags()
-        else:
-            self.bags_list, self.labels_list = self._form_bags()
+        self.bags_list, self.labels_list = self._form_bags()
 
     def _transform_single(self, x):
-        img = Image.fromarray(x.numpy(), mode='L')
-        return self.pil_to_rgb_tensor(img)
+        return self.pil_to_rgb_tensor(x)
 
     def _form_bags(self):
-        if self.train:
-            data = datasets.MNIST('data', train=True, download=True, transform=self.pil_to_rgb_tensor)
-        else:
-            data = datasets.MNIST('data', train=False, download=True, transform=self.pil_to_rgb_tensor)
+        mnist_train = datasets.MNIST('data', train=True, download=True)
+        mnist_test = datasets.MNIST('data', train=False, download=True)
+        mnist = ConcatDataset([mnist_train, mnist_test])
+        folds = list(KFold(n_splits=self.folds).split(mnist))
+        indices = set(folds[self.fold_id][0] if self.train else folds[self.fold_id][1])
 
         negative_samples = torch.stack(
-            [self._transform_single(d) for d, t in zip(data.data, data.targets) if t != self.target_number])
+            [self._transform_single(d) for idx, (d, t) in enumerate(mnist) if
+             idx in indices and t != self.target_number])
         positive_samples = torch.stack(
-            [self._transform_single(d) for d, t in zip(data.data, data.targets) if t == self.target_number])
+            [self._transform_single(d) for idx, (d, t) in enumerate(mnist) if
+             idx in indices and t == self.target_number])
 
         bags_list = []
         labels_list = []

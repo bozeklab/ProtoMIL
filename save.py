@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional, Tuple
 import numpy
 import torch
 
+from settings import Settings
 from train_and_test import TrainMode
 
 
@@ -22,7 +23,7 @@ def save_model_w_condition(model, model_dir, model_name, accu, target_accu, log=
 
 def save_train_state(file_path_prefix: str, model: torch.nn.Module, things_with_state: Dict[str, Any],
                      step: int, mode: TrainMode, epoch: int, iteration: Optional[int], experiment_run_name: str,
-                     best_accu: float, current_push_best_accu: Optional[float], current_accu: float):
+                     best_accu: float, current_push_best_accu: Optional[float], current_accu: float, config: Settings):
     file_path = '{}.{}.{:.2f}.pck'.format(file_path_prefix, step, current_accu * 100)
     # save and atomic replace
     new_file_path = file_path + '.new'
@@ -40,6 +41,7 @@ def save_train_state(file_path_prefix: str, model: torch.nn.Module, things_with_
             'torch_random': torch.random.get_rng_state(),
             'numpy_random': numpy.random.get_state(),
             'python_random': random.getstate(),
+            'settings': config,
         }, new_file_path)
         # atomic on POSIX
         os.replace(new_file_path, file_path)
@@ -73,6 +75,11 @@ def load_train_state(file_path: str, model: torch.nn.Module, things_with_state: 
             data['experiment_run_name'],
             data.get('best_accu', 0.),
             data.get('current_push_best_accu', None))
+
+
+def load_config_from_train_state(file_path: str):
+    data = torch.load(file_path)
+    return data.get('settings', None)
 
 
 def load_model_from_train_state(file_path: str, model: torch.nn.Module):
