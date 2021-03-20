@@ -347,8 +347,14 @@ while True:
         iteration += 1
         push_model_state_epoch = epoch
         if iteration >= config.num_last_layer_iterations:
-            generate_prototype_activation_matrix(ppnet, test_loader, train_push_loader, epoch, model_dir,
-                                                 torch.device('cuda'), log_writer, step)
+            log_writer.add_figure('prototype_analysis/positive',
+                                  generate_prototype_activation_matrix(ppnet, test_loader, train_push_loader, epoch,
+                                                                       model_dir, torch.device('cuda'), bag_class=0)
+                                  , global_step=step)
+            log_writer.add_figure('prototype_analysis/negative',
+                                  generate_prototype_activation_matrix(ppnet, test_loader, train_push_loader, epoch,
+                                                                       model_dir, torch.device('cuda'), bag_class=1)
+                                  , global_step=step)
             iteration = None
             epoch += 1
             mode = TrainMode.JOINT

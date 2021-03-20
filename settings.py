@@ -103,7 +103,7 @@ MNIST_SETTINGS = Settings(
     base_architecture='resnet18_small',
     img_size=28,
     prototype_number=10,
-    prototype_latent=128,
+    prototype_latent=64,
     prototype_conv_dim=(2, 2),
     joint_optimizer_lrs={
         'features': 1e-4,

@@ -15,8 +15,8 @@ from settings import MNIST_SETTINGS
 
 
 def generate_prototype_activation_matrix(ppnet, test_dataloader, push_dataloader, epoch,
-                                         model_dir, device, log_writer: SummaryWriter=None, step=-1):
-    print('    analysis')
+                                         model_dir, device, bag_class=0):
+    print('    analysis for class', bag_class)
     epoch_number_str = str(epoch)
     load_img_dir = os.path.join(model_dir, 'img')
 
@@ -28,7 +28,7 @@ def generate_prototype_activation_matrix(ppnet, test_dataloader, push_dataloader
     # print('Prototypes are chosen from ' + str(len(set(prototype_img_identity))) + ' number of classes.')
     # print('Their class identities are: ' + str(prototype_img_identity))
 
-    bag, label = next(iter(test_dataloader))
+    bag, label = next(((b, l) for b, l in iter(test_dataloader) if l == bag_class))
     bag = bag.squeeze(0)
 
     with torch.no_grad():
@@ -231,55 +231,53 @@ def generate_prototype_activation_matrix(ppnet, test_dataloader, push_dataloader
         l = l + 1
 
     plt.axis('off')
-    if log_writer:
-        log_writer.add_figure('prototype_analysis', fig, global_step=step)
-    else:
-        fig.show()
+    return fig
 
-#
-# if __name__ == '__main__':
-#     # %%
-#
-#     device = torch.device('cuda')
-#
-#     # %%
-#
-#     config = MNIST_SETTINGS
-#
-#     load_model_dir = 'saved_models/mnist.vulcan.2021-03-16T16:42:33.070310'  # 50
-#
-#     load_model_name = '20.push.best.57.94.00.pck'
-#
-#     load_model_path = os.path.join(load_model_dir, load_model_name)
-#
-#     ppnet = construct_PPNet(base_architecture=config.base_architecture,
-#                             pretrained=False,
-#                             img_size=config.img_size,
-#                             prototype_shape=config.prototype_shape,
-#                             num_classes=config.num_classes,
-#                             prototype_activation_function=config.prototype_activation_function,
-#                             add_on_layers_type=config.add_on_layers_type,
-#                             batch_norm_features=config.batch_norm_features)
-#     ppnet = ppnet.to(device)
-#
-#     print('load model from ' + load_model_path)
-#     load_model_from_train_state(load_model_path, ppnet)
-#
-#     ds_test = MnistBags(train=False, bag_length_mean=50, bag_length_std=2, positive_samples_in_bag_ratio_mean=0.1,
-#                         positive_samples_in_bag_ratio_std=0.02)
-#
-#     test_loader = torch.utils.data.DataLoader(
-#         ds_test, batch_size=None,
-#         shuffle=True,
-#         num_workers=0,
-#         pin_memory=False)
-#
-#     ds_push = MnistBags(train=True, push=True)
-#
-#     push_loader = torch.utils.data.DataLoader(
-#         ds_push, batch_size=None,
-#         shuffle=True,
-#         num_workers=0,
-#         pin_memory=False)
-#
-#     generate_prototype_activation_matrix(ppnet, test_loader, push_loader, 20, load_model_dir, device)
+
+if __name__ == '__main__':
+    # %%
+
+    device = torch.device('cuda')
+
+    # %%
+
+    config = MNIST_SETTINGS
+
+    load_model_dir = 'saved_models/mnist.vulcan.2021-03-16T16:42:33.070310'  # 50
+
+    load_model_name = '20.push.best.57.94.00.pck'
+
+    load_model_path = os.path.join(load_model_dir, load_model_name)
+
+    ppnet = construct_PPNet(base_architecture=config.base_architecture,
+                            pretrained=False,
+                            img_size=config.img_size,
+                            prototype_shape=config.prototype_shape,
+                            num_classes=config.num_classes,
+                            prototype_activation_function=config.prototype_activation_function,
+                            add_on_layers_type=config.add_on_layers_type,
+                            batch_norm_features=config.batch_norm_features)
+    ppnet = ppnet.to(device)
+
+    print('load model from ' + load_model_path)
+    load_model_from_train_state(load_model_path, ppnet)
+
+    ds_test = MnistBags(train=False, bag_length_mean=50, bag_length_std=2, positive_samples_in_bag_ratio_mean=0.1,
+                        positive_samples_in_bag_ratio_std=0.02)
+
+    test_loader = torch.utils.data.DataLoader(
+        ds_test, batch_size=None,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=False)
+
+    ds_push = MnistBags(train=True, push=True)
+
+    push_loader = torch.utils.data.DataLoader(
+        ds_push, batch_size=None,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=False)
+
+    fig = generate_prototype_activation_matrix(ppnet, test_loader, push_loader, 20, load_model_dir, device, bag_class=1)
+    plt.show()
