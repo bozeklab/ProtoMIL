@@ -77,6 +77,8 @@ class Settings:
             'positive_samples_in_bag_ratio_std': self.positive_samples_in_bag_ratio_std,
             'num_bags_train': self.num_bags_train,
             'num_bags_test': self.num_bags_test,
+            'folds': self.folds,
+            'fold_id': self.fold_id,
         }
 
     @classmethod
