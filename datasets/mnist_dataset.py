@@ -12,7 +12,7 @@ from torchvision import datasets, transforms
 class MnistBags(data_utils.Dataset):
     def __init__(self, target_number=9, bag_length_mean=200, bag_length_std=150, bag_length_min=50, bag_length_max=600,
                  positive_samples_in_bag_ratio_mean=0.3, positive_samples_in_bag_ratio_std=0.25,
-                 num_bags_train=1000, num_bags_test=500, seed=7, folds=10, fold_id=0, train=True, push=False):
+                 num_bags_train=300, num_bags_test=300, seed=7, folds=10, fold_id=0, train=True, push=False, all_labels=False):
         self.target_number = target_number
         self.mean_bag_length = bag_length_mean
         self.var_bag_length = bag_length_std
@@ -25,6 +25,7 @@ class MnistBags(data_utils.Dataset):
         self.max_bag_size = bag_length_max
         self.folds = folds
         self.fold_id = fold_id
+        self.all_labels = all_labels
 
         self.target_numbers_in_pos_bag_mean = positive_samples_in_bag_ratio_mean
         self.target_numbers_in_pos_bag_std = positive_samples_in_bag_ratio_std
@@ -96,7 +97,10 @@ class MnistBags(data_utils.Dataset):
 
     def __getitem__(self, index):
         bag = self.bags_list[index]
-        label = self.labels_list[index].max().unsqueeze(0)
+        if self.all_labels:
+            label = self.labels_list[index]
+        else:
+            label = self.labels_list[index].max().unsqueeze(0)
         if self.push:
             return bag, self.normalize_to_tensor_transform(bag), label
         else:
