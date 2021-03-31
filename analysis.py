@@ -15,7 +15,7 @@ from settings import MNIST_SETTINGS
 
 
 def generate_prototype_activation_matrix(ppnet, test_dataloader, push_dataloader, epoch,
-                                         model_dir, device, bag_class=0):
+                                         model_dir, device, bag_class=0, N=10):
     print('    analysis for class', bag_class)
     epoch_number_str = str(epoch)
     load_img_dir = os.path.join(model_dir, 'img')
@@ -28,7 +28,12 @@ def generate_prototype_activation_matrix(ppnet, test_dataloader, push_dataloader
     # print('Prototypes are chosen from ' + str(len(set(prototype_img_identity))) + ' number of classes.')
     # print('Their class identities are: ' + str(prototype_img_identity))
 
-    bag, label = next(((b, l) for b, l in iter(test_dataloader) if l == bag_class))
+    bag, label = next(((b, l) for b, l in iter(test_dataloader) if l.max().unsqueeze(0) == bag_class))
+    
+    count_positive_patches = sum(label)
+    if len(label) > 1:
+        label = label.max().unsqueeze(0)
+    
     bag = bag.squeeze(0)
 
     with torch.no_grad():
@@ -57,10 +62,9 @@ def generate_prototype_activation_matrix(ppnet, test_dataloader, push_dataloader
         # print('Actual: ' + str(correct_cls))
 
     # Take the N patches with the most attention
-    N = 10
     at = attention.squeeze(0).detach().cpu().numpy()
     top_patches = at.argsort()[-N:][::-1]
-    print(f'        patch indexes: {top_patches}')
+    # print(f'        patch indexes: {top_patches}')
 
     imgs = [bag[i].permute(1, 2, 0) for i in top_patches]
 
@@ -74,7 +78,7 @@ def generate_prototype_activation_matrix(ppnet, test_dataloader, push_dataloader
         for i in range(len(prototype_img_identity)):
             activation_pattern = prototype_activation_patterns[idx][i].detach().cpu().numpy()
             upsampled_activation_pattern = cv2.resize(activation_pattern, dsize=(28, 28),
-                                                      interpolation=cv2.INTER_CUBIC)
+                                                    interpolation=cv2.INTER_CUBIC)
 
             rescaled_activation_pattern = upsampled_activation_pattern - np.amin(upsampled_activation_pattern)
             rescaled_activation_pattern = rescaled_activation_pattern / np.amax(rescaled_activation_pattern)
@@ -137,7 +141,7 @@ def generate_prototype_activation_matrix(ppnet, test_dataloader, push_dataloader
 
     # Set up the axes with gridspec
     fig = plt.figure(figsize=(2 * N + 2 + k, len_proto + 2))
-    fig.suptitle(f'patches in bag: {len(bag)}, class label: {label.item()}', fontsize=40)
+    fig.suptitle(f'patches in bag: {len(bag)}, positive patches: {count_positive_patches}, class label: {label.item()}', fontsize=40)
 
     grid = plt.GridSpec(len_proto + 2, 2 * N + 2 + k, hspace=0.04, wspace=0.04)
 
@@ -154,11 +158,11 @@ def generate_prototype_activation_matrix(ppnet, test_dataloader, push_dataloader
             main_ax = fig.add_subplot(grid[i, j])
             main_ax.set_facecolor(colors[i - 2][l])
             main_ax.text(0.5 * (left + right), 0.5 * (bottom + top), grid_score[i - 2][l],
-                         horizontalalignment='center',
-                         verticalalignment='center',
-                         fontsize=15,
-                         color='white' if grid_score[i - 2][l] < grid_score.max() * 0.9 else 'black',
-                         transform=main_ax.transAxes)
+                        horizontalalignment='center',
+                        verticalalignment='center',
+                        fontsize=15,
+                        color='white' if grid_score[i - 2][l] < grid_score.max() * 0.9 else 'black',
+                        transform=main_ax.transAxes)
 
             main_ax.get_xaxis().set_visible(False)
             main_ax.get_yaxis().set_visible(False)
