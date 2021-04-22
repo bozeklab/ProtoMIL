@@ -9,6 +9,7 @@ import torch.nn.functional as func
 from focalloss import FocalLoss
 from helpers import list_of_distances
 from settings import Settings
+from weight_loss import WeightCrossEntropyLoss
 
 
 class TrainMode(Enum):
@@ -56,6 +57,10 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
             output, min_distances = model(input)
 
             cross_entropy = loss_fn(output, target)
+            if config.mil_pooling == 'loss_attention':
+                instance_labels = target * torch.ones(input.size(0), dtype=torch.long, device=input.device)
+                loss_2 = WeightCrossEntropyLoss()(model.out_c, instance_labels, model.A)
+                cross_entropy += 2.0 * loss_2
 
             if config.class_specific:
                 max_dist = (model.prototype_shape[1]

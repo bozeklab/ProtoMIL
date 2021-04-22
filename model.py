@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from base_models.lenet_features import lenet5_features
 from base_models.resnet_features import resnet18_features, resnet34_features, resnet50_features, resnet101_features, \
     resnet152_features
 from base_models.densenet_features import densenet121_features, densenet161_features, densenet169_features, \
@@ -32,7 +33,28 @@ base_architecture_to_features = {
     'vgg16': vgg16_features,
     'vgg16_bn': vgg16_bn_features,
     'vgg19': vgg19_features,
-    'vgg19_bn': vgg19_bn_features}
+    'vgg19_bn': vgg19_bn_features,
+    'lenet5': lenet5_features,
+}
+
+
+class LossAttentionLayer(nn.Module):
+    def __init__(self, dim=512):
+        super(LossAttentionLayer, self).__init__()
+        self.dim = dim
+        self.linear = nn.Linear(dim, 1)
+
+    def forward(self, features, W_1, b_1):
+        out_c = F.linear(features, W_1, b_1)
+        out = out_c - out_c.max()
+        out = out.exp()
+        out = out.sum(1, keepdim=True)
+        alpha = out / out.sum(0)
+
+        alpha01 = features.size(0) * alpha.expand_as(features)
+        context = torch.mul(features, alpha01)
+
+        return context, out_c, torch.squeeze(alpha)
 
 
 class PPNet(nn.Module):
@@ -73,7 +95,7 @@ class PPNet(nn.Module):
         self.features = features
 
         features_name = str(self.features).upper()
-        if features_name.startswith('VGG') or features_name.startswith('RES'):
+        if features_name.startswith('VGG') or features_name.startswith('RES') or features_name.startswith('LE'):
             first_add_on_layer_in_channels = \
                 [i for i in features.modules() if isinstance(
                     i, nn.Conv2d)][-1].out_channels
@@ -104,6 +126,8 @@ class PPNet(nn.Module):
                     add_on_layers.append(nn.Sigmoid())
                 current_in_channels = current_in_channels // 2
             self.add_on_layers = nn.Sequential(*add_on_layers)
+        elif add_on_layers_type == 'none':
+            self.add_on_layers = nn.Sequential()
         else:
             self.add_on_layers = nn.Sequential(
                 nn.Conv2d(in_channels=first_add_on_layer_in_channels,
@@ -145,6 +169,8 @@ class PPNet(nn.Module):
             self._initialize_weights()
 
         self.mil_pooling = mil_pooling
+        if mil_pooling == 'loss_attention':
+            self.loss_attention = LossAttentionLayer(self.num_prototypes)
 
     def conv_features(self, x):
         '''
@@ -233,6 +259,7 @@ class PPNet(nn.Module):
         prototype_activations = self.distance_2_similarity(min_distances)
 
         A = torch.ones((1, prototype_activations.shape[0])) / prototype_activations.shape[0]
+        out_c = None
         if self.mil_pooling == 'gated_attention':
             A_V = self.attention_V(prototype_activations)  # NxD
             A_U = self.attention_U(prototype_activations)  # NxD
@@ -246,10 +273,16 @@ class PPNet(nn.Module):
             M = torch.amax(prototype_activations, dim=0, keepdim=True)
         elif self.mil_pooling == 'min':
             M = torch.amin(prototype_activations, dim=0, keepdim=True)
+        elif self.mil_pooling == 'loss_attention':
+            M, out_c, A = self.loss_attention(prototype_activations, self.last_layer.weight, self.last_layer.bias)
+            M = M.mean(0, keepdim=True)
         else:
             raise NotImplementedError()
 
         logits = self.last_layer(M)
+
+        self.out_c = out_c
+        self.A = A
 
         return logits, min_distances, A, prototype_activations
 
