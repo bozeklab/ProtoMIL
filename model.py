@@ -39,10 +39,8 @@ base_architecture_to_features = {
 
 
 class LossAttentionLayer(nn.Module):
-    def __init__(self, dim=512):
+    def __init__(self):
         super(LossAttentionLayer, self).__init__()
-        self.dim = dim
-        self.linear = nn.Linear(dim, 1)
 
     def forward(self, features, W_1, b_1):
         out_c = F.linear(features, W_1, b_1)
@@ -170,7 +168,7 @@ class PPNet(nn.Module):
 
         self.mil_pooling = mil_pooling
         if mil_pooling == 'loss_attention':
-            self.loss_attention = LossAttentionLayer(self.num_prototypes)
+            self.loss_attention = LossAttentionLayer()
 
     def conv_features(self, x):
         '''

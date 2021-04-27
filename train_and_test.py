@@ -217,12 +217,12 @@ def last_only(model):
 
 
 def warm_only(model):
-    _freeze_layer(model.features)
+    _unfreeze_layer(model.features)
     _unfreeze_layer(model.add_on_layers)
 
-    _freeze_layer(model.attention_V)
-    _freeze_layer(model.attention_U)
-    _freeze_layer(model.attention_weights)
+    _unfreeze_layer(model.attention_V)
+    _unfreeze_layer(model.attention_U)
+    _unfreeze_layer(model.attention_weights)
 
     model.prototype_vectors.requires_grad = True
 

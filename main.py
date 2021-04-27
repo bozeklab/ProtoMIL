@@ -46,6 +46,7 @@ parser.add_argument('-n', '--new_experiment', default=False, action='store_true'
 parser.add_argument('-l', '--load_state', metavar='STATE_FILE', type=str, default=None,
                     help='Continue training from specified state file (saved checkpoint will be lost)')
 parser.add_argument('-c', '--run_name_prefix', type=str, default=None, help='Prefix for the experiment name')
+parser.add_argument('-a', '--alloc', type=int, default=None)
 parser.add_argument('--deterministic', type=str2bool, default=True, help='Use deterministic mode (slightly slower)')
 for param_name, param_type in Settings.as_params():
     parser.add_argument('--{}'.format(param_name), type=param_type)
@@ -82,6 +83,10 @@ if config is None:
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpuid)
 print('CUDA available:', torch.cuda.is_available())
+
+if args.alloc:
+    mem_holder = torch.randint(0, 1, size=(args.alloc * 1024 * 1024 // 8,), dtype=torch.int64,
+                               device=torch.device('cuda'))
 
 config = config.new_from_params(args)
 print(config)
@@ -158,6 +163,11 @@ joint_optimizer_specs = [
 
 warm_optimizer_specs = [
     {
+        'params': ppnet.features.parameters(),
+        'lr': config.joint_optimizer_lrs['features'],
+        'weight_decay': 1e-3
+    },
+    {
         'params': ppnet.add_on_layers.parameters(),
         'lr': config.warm_optimizer_lrs['add_on_layers'],
         'weight_decay': 1e-3
@@ -166,6 +176,22 @@ warm_optimizer_specs = [
         'params': ppnet.prototype_vectors,
         'lr': config.warm_optimizer_lrs['prototype_vectors']
     },
+    {
+        'params': ppnet.last_layer.parameters(),
+        'lr': config.last_layer_optimizer_lr['last_layer']
+    },
+    {
+        'params': ppnet.attention_V.parameters(),
+        'lr': config.last_layer_optimizer_lr['attention']
+    },
+    {
+        'params': ppnet.attention_U.parameters(),
+        'lr': config.last_layer_optimizer_lr['attention']
+    },
+    {
+        'params': ppnet.attention_weights.parameters(),
+        'lr': config.last_layer_optimizer_lr['attention']
+    }
 ]
 
 last_layer_optimizer_specs = [
@@ -283,9 +309,9 @@ def write_mode(mode: TrainMode, log_writer: SummaryWriter, step: int):
 last_checkpoint = step
 push_model_state_epoch = None
 
-if epoch < config.push_start and ppnet.mil_pooling == 'gated_attention':
-    ppnet.mil_pooling = 'average'
-    print('\tattention disabled')
+# if epoch < config.push_start and ppnet.mil_pooling == 'gated_attention':
+#     ppnet.mil_pooling = 'average'
+#     print('\tattention disabled')
 
 # training loop as a state machine.
 while True:
@@ -349,11 +375,11 @@ while True:
         if iteration >= config.num_last_layer_iterations:
             log_writer.add_figure('prototype_analysis/positive',
                                   generate_prototype_activation_matrix(ppnet, test_loader, train_push_loader, epoch,
-                                                                       model_dir, torch.device('cuda'), bag_class=0)
+                                                                       model_dir, torch.device('cuda'), bag_class=1)
                                   , global_step=step)
             log_writer.add_figure('prototype_analysis/negative',
                                   generate_prototype_activation_matrix(ppnet, test_loader, train_push_loader, epoch,
-                                                                       model_dir, torch.device('cuda'), bag_class=1)
+                                                                       model_dir, torch.device('cuda'), bag_class=0)
                                   , global_step=step)
             iteration = None
             epoch += 1
@@ -396,3 +422,6 @@ save_train_state(best_model_path, ppnet, other_state, step, mode, epoch, iterati
                  best_accu, current_push_best_accu, accu, config)
 [os.remove(checkpoint) for checkpoint in get_state_path_for_prefix(checkpoint_file_prefix)]
 log_writer.close()
+
+if args.alloc:
+    print(mem_holder[0].item())
