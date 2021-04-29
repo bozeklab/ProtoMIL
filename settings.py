@@ -114,18 +114,18 @@ MNIST_SETTINGS = Settings(
     },
     joint_lr_step_size=5,
     warm_optimizer_lrs={
-        'features': 1e-4,
-        'add_on_layers': 3e-3,
-        'prototype_vectors': 3e-3,
+        'features': 1e-3,
+        'add_on_layers': 1e-3,
+        'prototype_vectors': 1e-3,
         'attention': 1e-3,
-        'last_layer': 1e-4,
+        'last_layer': 1e-3,
     },
     last_layer_optimizer_lr={
         'attention': 1e-3,
         'last_layer': 1e-4,
     },
     num_train_epochs=101,
-    num_warm_epochs=5,
+    num_warm_epochs=30,
     num_last_layer_iterations=20,
     push_start=30,
     push_epochs=[i for i in range(200) if i % 10 == 0]
