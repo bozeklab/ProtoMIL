@@ -49,12 +49,16 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
 
     for i, (image, label) in enumerate(dataloader):
         input = image.cuda()
+
+        if len(label) > 1:
+            label = label.max().unsqueeze(0)
+
         target = label.cuda()
 
         # torch.enable_grad() has no effect outside of no_grad()
         grad_req = torch.enable_grad() if is_train else torch.no_grad()
         with grad_req:
-            output, min_distances = model(input)
+            output, min_distances, attention, _ = model.forward_(input)
 
             cross_entropy = loss_fn(output, target)
             if config.mil_pooling == 'loss_attention':
@@ -68,20 +72,25 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
                             * model.prototype_shape[3])
 
                 # prototypes_of_correct_class is a tensor of shape batch_size * num_prototypes
+                
+                a = attention.detach().cpu()
+                tmp = np.interp(a, (a.min(), a.max()), (0.001, 1))
+                m = torch.tensor(tmp).cuda()
+
                 # calculate cluster cost
                 prototypes_of_correct_class = torch.t(model.prototype_class_identity[:, label]).cuda()
-                inverted_distances, _ = torch.max((max_dist - min_distances) * prototypes_of_correct_class, dim=1)
+                inverted_distances, _ = torch.max((max_dist - (min_distances * m.T)) * prototypes_of_correct_class, dim=1)
                 cluster_cost = torch.mean(max_dist - inverted_distances)
 
                 # calculate separation cost
                 prototypes_of_wrong_class = 1 - prototypes_of_correct_class
                 inverted_distances_to_nontarget_prototypes, _ = \
-                    torch.max((max_dist - min_distances) * prototypes_of_wrong_class, dim=1)
+                    torch.max((max_dist - (min_distances * m.T)) * prototypes_of_wrong_class, dim=1)
                 separation_cost = torch.mean(max_dist - inverted_distances_to_nontarget_prototypes)
 
                 # calculate avg cluster cost
                 avg_separation_cost = \
-                    torch.sum(min_distances * prototypes_of_wrong_class, dim=1) / torch.sum(prototypes_of_wrong_class,
+                    torch.sum((min_distances * m.T) * prototypes_of_wrong_class, dim=1) / torch.sum(prototypes_of_wrong_class,
                                                                                             dim=1)
                 avg_separation_cost = torch.mean(avg_separation_cost)
 

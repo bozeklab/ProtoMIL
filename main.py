@@ -123,7 +123,7 @@ if args.dataset == 'colon_cancer':
 elif args.dataset == 'mnist':
     ds = MnistBags(train=True, seed=seed, **config.dataset_settings)
     ds_push = MnistBags(train=True, push=True, seed=seed, **config.dataset_settings)
-    ds_test = MnistBags(train=False, seed=seed, **config.dataset_settings)
+    ds_test = MnistBags(train=False, seed=seed, **config.dataset_settings, all_labels=True)
 else:
     raise NotImplementedError()
 
