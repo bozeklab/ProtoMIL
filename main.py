@@ -47,6 +47,7 @@ parser.add_argument('-l', '--load_state', metavar='STATE_FILE', type=str, defaul
                     help='Continue training from specified state file (saved checkpoint will be lost)')
 parser.add_argument('-c', '--run_name_prefix', type=str, default=None, help='Prefix for the experiment name')
 parser.add_argument('-a', '--alloc', type=int, default=None)
+parser.add_argument('-w', '--weighting_attention', default=False, action='store_true')
 parser.add_argument('--deterministic', type=str2bool, default=True, help='Use deterministic mode (slightly slower)')
 for param_name, param_type in Settings.as_params():
     parser.add_argument('--{}'.format(param_name), type=param_type)
@@ -320,8 +321,8 @@ while True:
         write_mode(TrainMode.WARM, log_writer, step)
         warm_only(model=ppnet)
         train(model=ppnet, dataloader=train_loader, optimizer=warm_optimizer, config=config, log_writer=log_writer,
-              step=step)
-        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step)
+              step=step, weighting_attention=args.weighting_attention)
+        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
         push_model_state_epoch = None
         epoch += 1
         if epoch >= config.num_warm_epochs:
@@ -330,9 +331,9 @@ while True:
         write_mode(TrainMode.JOINT, log_writer, step)
         joint(model=ppnet)
         train(model=ppnet, dataloader=train_loader, optimizer=joint_optimizer, config=config, log_writer=log_writer,
-              step=step)
+              step=step, weighting_attention=args.weighting_attention)
         joint_lr_scheduler.step()
-        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step)
+        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
         push_model_state_epoch = None
         if epoch >= config.push_start and epoch in config.push_epochs:
             mode = TrainMode.PUSH
@@ -352,7 +353,7 @@ while True:
             prototype_self_act_filename_prefix=prototype_self_act_filename_prefix,
             proto_bound_boxes_filename_prefix=proto_bound_boxes_filename_prefix,
             save_prototype_class_identity=True)
-        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step)
+        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
         push_model_state_epoch = epoch
         current_push_best_accu = 0.
         if config.mil_pooling == 'gated_attention' and not ppnet.mil_pooling == 'gated_attention':
@@ -368,8 +369,8 @@ while True:
         write_mode(TrainMode.LAST_ONLY, log_writer, step)
         last_only(model=ppnet)
         train(model=ppnet, dataloader=train_loader, optimizer=last_layer_optimizer, config=config,
-              log_writer=log_writer, step=step)
-        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step)
+              log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
         iteration += 1
         push_model_state_epoch = epoch
         if iteration >= config.num_last_layer_iterations:

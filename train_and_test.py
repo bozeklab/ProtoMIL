@@ -20,7 +20,7 @@ class TrainMode(Enum):
 
 
 def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_mask=True,
-                   log_writer: SummaryWriter = None, step: int = 0):
+                   log_writer: SummaryWriter = None, step: int = 0, weighting_attention=False):
     '''
     model: the multi-gpu model
     dataloader:
@@ -50,6 +50,7 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     for i, (image, label) in enumerate(dataloader):
         input = image.cuda()
 
+        # if param all_labels=True in dataloader, set label to positive if at least one in the list
         if len(label) > 1:
             label = label.max().unsqueeze(0)
 
@@ -73,24 +74,28 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
 
                 # prototypes_of_correct_class is a tensor of shape batch_size * num_prototypes
                 
-                a = attention.detach().cpu()
-                tmp = np.interp(a, (a.min(), a.max()), (0.001, 1))
-                m = torch.tensor(tmp).cuda()
+                attention_detached = attention.detach().cpu()
+                weight = np.interp(attention_detached, (attention_detached.min(), attention_detached.max()), (0.001, 1))
+                
+                if weighting_attention:
+                    tensor_weight = torch.tensor(weight).cuda()
+                else:
+                    tensor_weight = torch.tensor(1).cuda()
 
                 # calculate cluster cost
                 prototypes_of_correct_class = torch.t(model.prototype_class_identity[:, label]).cuda()
-                inverted_distances, _ = torch.max((max_dist - (min_distances * m.T)) * prototypes_of_correct_class, dim=1)
+                inverted_distances, _ = torch.max((max_dist - (min_distances * tensor_weight.T)) * prototypes_of_correct_class, dim=1)
                 cluster_cost = torch.mean(max_dist - inverted_distances)
 
                 # calculate separation cost
                 prototypes_of_wrong_class = 1 - prototypes_of_correct_class
                 inverted_distances_to_nontarget_prototypes, _ = \
-                    torch.max((max_dist - (min_distances * m.T)) * prototypes_of_wrong_class, dim=1)
+                    torch.max((max_dist - (min_distances * tensor_weight.T)) * prototypes_of_wrong_class, dim=1)
                 separation_cost = torch.mean(max_dist - inverted_distances_to_nontarget_prototypes)
 
                 # calculate avg cluster cost
                 avg_separation_cost = \
-                    torch.sum((min_distances * m.T) * prototypes_of_wrong_class, dim=1) / torch.sum(prototypes_of_wrong_class,
+                    torch.sum((min_distances * tensor_weight.T) * prototypes_of_wrong_class, dim=1) / torch.sum(prototypes_of_wrong_class,
                                                                                             dim=1)
                 avg_separation_cost = torch.mean(avg_separation_cost)
 
@@ -187,20 +192,20 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
 
 
 def train(model, dataloader, optimizer, config: Settings, log_writer: SummaryWriter = None,
-          step: int = 0):
+          step: int = 0, weighting_attention=False):
     assert (optimizer is not None)
 
     print('\ttrain')
     model.train()
     return _train_or_test(model=model, dataloader=dataloader, config=config, optimizer=optimizer,
-                          log_writer=log_writer, step=step)
+                          log_writer=log_writer, step=step, weighting_attention=weighting_attention)
 
 
-def test(model, dataloader, config: Settings, log_writer: SummaryWriter = None, step: int = 0):
+def test(model, dataloader, config: Settings, log_writer: SummaryWriter = None, step: int = 0, weighting_attention=False):
     print('\ttest')
     model.eval()
     return _train_or_test(model=model, dataloader=dataloader, config=config, optimizer=None,
-                          log_writer=log_writer, step=step)
+                          log_writer=log_writer, step=step, weighting_attention=weighting_attention)
 
 
 def _freeze_layer(layer):
