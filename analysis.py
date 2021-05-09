@@ -77,7 +77,7 @@ def generate_prototype_activation_matrix(ppnet, test_dataloader, push_dataloader
         # for every prototype
         for i in range(len(prototype_img_identity)):
             activation_pattern = prototype_activation_patterns[idx][i].detach().cpu().numpy()
-            upsampled_activation_pattern = cv2.resize(activation_pattern, dsize=(28, 28),
+            upsampled_activation_pattern = cv2.resize(activation_pattern, dsize=(original_img.shape[0], original_img.shape[1]),
                                                     interpolation=cv2.INTER_CUBIC)
 
             rescaled_activation_pattern = upsampled_activation_pattern - np.amin(upsampled_activation_pattern)
