@@ -11,8 +11,8 @@ from torchvision import datasets, transforms
 
 class MnistBags(data_utils.Dataset):
     def __init__(self, target_number=9, bag_length_mean=200, bag_length_std=150, bag_length_min=50, bag_length_max=600,
-                 positive_samples_in_bag_ratio_mean=0.3, positive_samples_in_bag_ratio_std=0.25,
-                 num_bags_train=300, num_bags_test=300, seed=7, folds=10, fold_id=0, train=True, push=False, all_labels=False):
+                 positive_samples_in_bag_ratio_mean=0.1, positive_samples_in_bag_ratio_std=0.01,
+                 num_bags_train=300, num_bags_test=300, seed=7, folds=10, fold_id=0, random_state=3, train=True, push=False, test=False, all_labels=False):
         self.target_number = target_number
         self.mean_bag_length = bag_length_mean
         self.var_bag_length = bag_length_std
@@ -20,11 +20,13 @@ class MnistBags(data_utils.Dataset):
         self.seed = seed
         self.train = train
         self.push = push
+        self.test = test
         self.negative_bags = self.num_bag // 2
         self.min_bag_size = bag_length_min
         self.max_bag_size = bag_length_max
         self.folds = folds
         self.fold_id = fold_id
+        self.random_state = random_state
         self.all_labels = all_labels
 
         self.target_numbers_in_pos_bag_mean = positive_samples_in_bag_ratio_mean
@@ -50,9 +52,18 @@ class MnistBags(data_utils.Dataset):
         mnist_train = datasets.MNIST('data', train=True, download=True)
         mnist_test = datasets.MNIST('data', train=False, download=True)
         mnist = ConcatDataset([mnist_train, mnist_test])
-        folds = list(KFold(n_splits=self.folds, shuffle=True, random_state=3).split(mnist))
-        indices = set(folds[self.fold_id][0] if self.train else folds[self.fold_id][1])
+        folds = list(KFold(n_splits=self.folds, shuffle=True, random_state=self.random_state).split(mnist))
 
+        # fold_id=0 busy for test fold
+        if self.test:
+            indices = set(folds[0][1])
+        else:
+            if self.train:
+                test_indices = set(folds[0][1])
+                indices = set(folds[self.fold_id][0]) - test_indices
+            else: # valid
+                indices = set(folds[self.fold_id][1])
+        
         negative_samples = torch.stack(
             [self._transform_single(d) for idx, (d, t) in enumerate(mnist) if
              idx in indices and t != self.target_number])
