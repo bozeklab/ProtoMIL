@@ -5,6 +5,8 @@ import os
 import platform
 import random
 import sys
+import glob
+import operator
 
 import matplotlib
 import numpy
@@ -19,9 +21,9 @@ from helpers import makedir, str2bool
 from model import construct_PPNet
 from push import push_prototypes
 from save import load_train_state, save_train_state, get_state_path_for_prefix, snapshot_code, \
-    load_config_from_train_state
+    load_config_from_train_state, load_model_from_train_state
 from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS, Settings
-from train_and_test import warm_only, train, joint, test, last_only, TrainMode
+from train_and_test import warm_only, train, joint, test, last_only, TrainMode, valid
 
 matplotlib.use('Agg')
 
@@ -119,18 +121,19 @@ if args.dataset == 'colon_cancer':
     ds_push = ColonCancerBagsCross(path="data/ColonCancer", train=True, train_val_idxs=train_range,
                                    test_idxs=test_range,
                                    push=True, shuffle_bag=True)
-    ds_test = ColonCancerBagsCross(path="data/ColonCancer", train=False, train_val_idxs=train_range,
+    ds_valid = ColonCancerBagsCross(path="data/ColonCancer", train=False, train_val_idxs=train_range,
                                    test_idxs=test_range)
 elif args.dataset == 'mnist':
     ds = MnistBags(train=True, seed=seed, **config.dataset_settings)
     ds_push = MnistBags(train=True, push=True, seed=seed, **config.dataset_settings)
-    ds_test = MnistBags(train=False, seed=seed, **config.dataset_settings, all_labels=True)
+    ds_valid = MnistBags(train=False, seed=seed, **config.dataset_settings, all_labels=True)
+    ds_test = MnistBags(train=False, test=True, seed=seed, **config.dataset_settings, all_labels=True)
 else:
     raise NotImplementedError()
 
 print('Dataset loaded.')
-print('training set size: {}, push set size: {}, test set size: {}'.format(
-    len(ds), len(ds_push), len(ds_test)))
+print('training set size: {}, push set size: {}, valid set size: {}, test set size: {}'.format(
+    len(ds), len(ds_push), len(ds_valid), len(ds_test)))
 
 ppnet = construct_PPNet(base_architecture=config.base_architecture,
                         pretrained=False, img_size=config.img_size,
@@ -275,6 +278,10 @@ train_push_loader = torch.utils.data.DataLoader(
     ds_push, batch_size=None, shuffle=False,
     num_workers=workers,
     pin_memory=False)
+valid_loader = torch.utils.data.DataLoader(
+    ds_valid, batch_size=None, shuffle=False,
+    num_workers=workers,
+    pin_memory=False)
 test_loader = torch.utils.data.DataLoader(
     ds_test, batch_size=None, shuffle=False,
     num_workers=workers,
@@ -282,8 +289,8 @@ test_loader = torch.utils.data.DataLoader(
 
 # noinspection PyTypeChecker
 log_writer.add_text('dataset_stats',
-                    'training set size: {}, push set size: {}, test set size: {}'.format(
-                        len(train_loader.dataset), len(train_push_loader.dataset), len(test_loader.dataset)),
+                    'training set size: {}, push set size: {}, valid set size: {}, test set size: {}'.format(
+                        len(train_loader.dataset), len(train_push_loader.dataset), len(valid_loader.dataset), len(test_loader.dataset)),
                     global_step=step)
 log_writer.add_text('seed', str(seed), global_step=step)
 config_md = '\n'.join(
@@ -322,7 +329,7 @@ while True:
         warm_only(model=ppnet)
         train(model=ppnet, dataloader=train_loader, optimizer=warm_optimizer, config=config, log_writer=log_writer,
               step=step, weighting_attention=args.weighting_attention)
-        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
         push_model_state_epoch = None
         epoch += 1
         if epoch >= config.num_warm_epochs:
@@ -333,7 +340,7 @@ while True:
         train(model=ppnet, dataloader=train_loader, optimizer=joint_optimizer, config=config, log_writer=log_writer,
               step=step, weighting_attention=args.weighting_attention)
         joint_lr_scheduler.step()
-        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
         push_model_state_epoch = None
         if epoch >= config.push_start and epoch in config.push_epochs:
             mode = TrainMode.PUSH
@@ -353,7 +360,7 @@ while True:
             prototype_self_act_filename_prefix=prototype_self_act_filename_prefix,
             proto_bound_boxes_filename_prefix=proto_bound_boxes_filename_prefix,
             save_prototype_class_identity=True)
-        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
         push_model_state_epoch = epoch
         current_push_best_accu = 0.
         if config.mil_pooling == 'gated_attention' and not ppnet.mil_pooling == 'gated_attention':
@@ -370,16 +377,16 @@ while True:
         last_only(model=ppnet)
         train(model=ppnet, dataloader=train_loader, optimizer=last_layer_optimizer, config=config,
               log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
-        accu = test(model=ppnet, dataloader=test_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
         iteration += 1
         push_model_state_epoch = epoch
         if iteration >= config.num_last_layer_iterations:
             log_writer.add_figure('prototype_analysis/positive',
-                                  generate_prototype_activation_matrix(ppnet, test_loader, train_push_loader, epoch,
+                                  generate_prototype_activation_matrix(ppnet, valid_loader, train_push_loader, epoch,
                                                                        model_dir, torch.device('cuda'), bag_class=1)
                                   , global_step=step)
             log_writer.add_figure('prototype_analysis/negative',
-                                  generate_prototype_activation_matrix(ppnet, test_loader, train_push_loader, epoch,
+                                  generate_prototype_activation_matrix(ppnet, valid_loader, train_push_loader, epoch,
                                                                        model_dir, torch.device('cuda'), bag_class=0)
                                   , global_step=step)
             iteration = None
@@ -417,6 +424,43 @@ while True:
         save_train_state(checkpoint_file_prefix, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
                          best_accu, current_push_best_accu, accu, config)
         last_checkpoint = step
+
+# test
+# find push with max accuracy
+model_path_to_acc = {}
+for i in config.push_epochs:
+    if i >= config.push_start and i < config.num_train_epochs:
+        model_push_path = glob.glob(model_dir + f"/{i}*")[0]
+        model_path_to_acc[model_push_path] = float(".".join(model_push_path.split(".")[-3:-1]))
+
+path_to_model_with_max_push_acc = max(model_path_to_acc.items(), key=operator.itemgetter(1))[0]
+
+ppnet_test = construct_PPNet(base_architecture=config.base_architecture,
+                        pretrained=False, 
+                        img_size=config.img_size,
+                        prototype_shape=config.prototype_shape,
+                        num_classes=config.num_classes,
+                        prototype_activation_function=config.prototype_activation_function,
+                        add_on_layers_type=config.add_on_layers_type,
+                        batch_norm_features=config.batch_norm_features)
+
+print('load model from ' + path_to_model_with_max_push_acc)
+load_model_from_train_state(path_to_model_with_max_push_acc, ppnet_test)
+
+ppnet_test = ppnet_test.cuda()
+
+accu = test(model=ppnet_test, dataloader=test_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+
+epoch_for_ppnet_test = path_to_model_with_max_push_acc.split(".")[-7].split("/")[-1]
+
+log_writer.add_figure('test_prototype_analysis/positive',
+                        generate_prototype_activation_matrix(ppnet_test, test_loader, train_push_loader, epoch_for_ppnet_test,
+                                                            model_dir, torch.device('cuda'), bag_class=1)
+                        , global_step=step )
+log_writer.add_figure('test_prototype_analysis/negative',
+                        generate_prototype_activation_matrix(ppnet_test, test_loader, train_push_loader, epoch_for_ppnet_test,
+                                                            model_dir, torch.device('cuda'), bag_class=0)
+                        , global_step=step)
 
 best_model_path = os.path.join(model_dir, 'end')
 save_train_state(best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,

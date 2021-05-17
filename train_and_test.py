@@ -20,7 +20,7 @@ class TrainMode(Enum):
 
 
 def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_mask=True,
-                   log_writer: SummaryWriter = None, step: int = 0, weighting_attention=False):
+                   log_writer: SummaryWriter = None, step: int = 0, weighting_attention=False, is_valid=False):
     '''
     model: the multi-gpu model
     dataloader:
@@ -163,7 +163,14 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     print('\t\tauc:', auc)
     print('\t\ttotal_loss:', total_loss)
 
-    suffix = '/train' if is_train else '/test'
+    if is_train:
+        suffix = '/train'
+    else:
+        if is_valid:
+            suffix = '/valid'
+        else:
+            suffix = '/test'
+
     if log_writer:
 
         log_writer.add_scalar('total_loss' + suffix, total_loss, global_step=step)
@@ -200,6 +207,11 @@ def train(model, dataloader, optimizer, config: Settings, log_writer: SummaryWri
     return _train_or_test(model=model, dataloader=dataloader, config=config, optimizer=optimizer,
                           log_writer=log_writer, step=step, weighting_attention=weighting_attention)
 
+def valid(model, dataloader, config: Settings, log_writer: SummaryWriter = None, step: int = 0, weighting_attention=False):
+    print('\tvalid')
+    model.eval()
+    return _train_or_test(model=model, dataloader=dataloader, config=config, optimizer=None,
+                          log_writer=log_writer, step=step, weighting_attention=weighting_attention, is_valid=True)
 
 def test(model, dataloader, config: Settings, log_writer: SummaryWriter = None, step: int = 0, weighting_attention=False):
     print('\ttest')
