@@ -45,7 +45,8 @@ class Settings:
     positive_samples_in_bag_ratio_mean: float = 0.3
     positive_samples_in_bag_ratio_std: float = 0.25
     folds: int = 10
-    fold_id: int = 0
+    fold_id: int = 1
+    random_state: int = 3
 
     random_seed_presets: List[int] = dataclasses.field(
         default_factory=lambda: [631056511, 923928841, 53306087, 937272127, 207121037])
