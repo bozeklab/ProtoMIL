@@ -220,6 +220,7 @@ last_layer_optimizer_specs = [
 joint_optimizer = torch.optim.Adam(joint_optimizer_specs)
 joint_lr_scheduler = torch.optim.lr_scheduler.StepLR(joint_optimizer, step_size=config.joint_lr_step_size, gamma=0.1)
 warm_optimizer = torch.optim.Adam(warm_optimizer_specs)
+warm_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(warm_optimizer, gamma=0.9)
 last_layer_optimizer = torch.optim.Adam(last_layer_optimizer_specs)
 
 other_state = {
@@ -329,10 +330,13 @@ while True:
         warm_only(model=ppnet)
         train(model=ppnet, dataloader=train_loader, optimizer=warm_optimizer, config=config, log_writer=log_writer,
               step=step, weighting_attention=args.weighting_attention)
+        warm_lr_scheduler.step()
         accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
         push_model_state_epoch = None
         epoch += 1
-        if epoch >= config.num_warm_epochs:
+        if epoch >= config.push_start and epoch in config.push_epochs:
+            mode = TrainMode.PUSH
+        elif epoch >= config.num_warm_epochs:
             mode = TrainMode.JOINT
     elif mode == TrainMode.JOINT:
         write_mode(TrainMode.JOINT, log_writer, step)
@@ -436,7 +440,7 @@ for i in config.push_epochs:
 path_to_model_with_max_push_acc = max(model_path_to_acc.items(), key=operator.itemgetter(1))[0]
 
 ppnet_test = construct_PPNet(base_architecture=config.base_architecture,
-                        pretrained=False, 
+                        pretrained=False,
                         img_size=config.img_size,
                         prototype_shape=config.prototype_shape,
                         num_classes=config.num_classes,

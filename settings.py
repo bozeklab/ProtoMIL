@@ -24,7 +24,7 @@ class Settings:
 
     num_classes: int = 2
     coef_crs_ent: float = 1
-    coef_clst: float = 0.8
+    coef_clst: float = 0.6
     coef_sep: float = -0.08
     coef_l1: float = 1e-4
 
@@ -115,18 +115,18 @@ MNIST_SETTINGS = Settings(
     },
     joint_lr_step_size=5,
     warm_optimizer_lrs={
-        'features': 1e-3,
-        'add_on_layers': 1e-3,
-        'prototype_vectors': 1e-3,
-        'attention': 1e-3,
-        'last_layer': 1e-3,
+        'features': 3e-3,
+        'add_on_layers': 3e-3,
+        'prototype_vectors': 3e-3,
+        'attention': 3e-3,
+        'last_layer': 3e-3,
     },
     last_layer_optimizer_lr={
         'attention': 1e-3,
         'last_layer': 1e-4,
     },
     num_train_epochs=101,
-    num_warm_epochs=30,
+    num_warm_epochs=31,
     num_last_layer_iterations=20,
     push_start=30,
     push_epochs=[i for i in range(200) if i % 10 == 0]
@@ -140,9 +140,9 @@ COLON_CANCER_SETTINGS = Settings(
     prototype_conv_dim=(2, 2),
     loss_function='focal',
     joint_optimizer_lrs={
-        'features': 1e-4,
-        'add_on_layers': 3e-3,
-        'prototype_vectors': 3e-3,
+        'features': 1e-5,
+        'add_on_layers': 3e-4,
+        'prototype_vectors': 3e-4,
     },
     joint_lr_step_size=5,
     warm_optimizer_lrs={
