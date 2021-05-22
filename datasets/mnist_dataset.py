@@ -54,16 +54,15 @@ class MnistBags(data_utils.Dataset):
         mnist = ConcatDataset([mnist_train, mnist_test])
         folds = list(KFold(n_splits=self.folds, shuffle=True, random_state=self.random_state).split(mnist))
 
-        # fold_id=0 busy for test fold
         if self.test:
-            indices = set(folds[0][1])
+            indices = set(folds[self.fold_id][1])
         else:
             if self.train:
-                test_indices = set(folds[0][1])
-                indices = set(folds[self.fold_id][0]) - test_indices
+                val_indices = self.r.choice(folds[self.fold_id][0], len(folds[self.fold_id][1]))
+                indices = set(folds[self.fold_id][0]) - set(val_indices)
             else: # valid
-                indices = set(folds[self.fold_id][1])
-        
+                indices = self.r.choice(folds[self.fold_id][0], len(folds[self.fold_id][1]))
+
         negative_samples = torch.stack(
             [self._transform_single(d) for idx, (d, t) in enumerate(mnist) if
              idx in indices and t != self.target_number])
