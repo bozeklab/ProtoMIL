@@ -15,6 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
 
 from analysis import generate_prototype_activation_matrix
+from datasets.breast_dataset import BreastCancerBagsCross
 from datasets.colon_dataset import ColonCancerBagsCross
 from datasets.mnist_dataset import MnistBags
 from helpers import makedir, str2bool
@@ -22,7 +23,7 @@ from model import construct_PPNet
 from push import push_prototypes
 from save import load_train_state, save_train_state, get_state_path_for_prefix, snapshot_code, \
     load_config_from_train_state, load_model_from_train_state
-from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS, Settings
+from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS, Settings, BREAST_CANCER_SETTINGS
 from train_and_test import warm_only, train, joint, test, last_only, TrainMode, valid
 
 matplotlib.use('Agg')
@@ -41,7 +42,7 @@ CHECKPOINT_FREQUENCY_STEPS = 3
 # noinspection PyTypeChecker
 parser = argparse.ArgumentParser(prog='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpuid', type=int, default=0, help='CUDA device id to use')
-parser.add_argument('-d', '--dataset', type=str, required=True, choices=['mnist', 'colon_cancer'],
+parser.add_argument('-d', '--dataset', type=str, required=True, choices=['mnist', 'colon_cancer', 'breast_cancer'],
                     help='Select dataset')
 parser.add_argument('-n', '--new_experiment', default=False, action='store_true',
                     help='Overwrite any saved state and start a new experiment (saved checkpoint will be lost)')
@@ -81,6 +82,7 @@ if config is None:
     print('Using default base settings for', args.dataset)
     config = {
         'colon_cancer': COLON_CANCER_SETTINGS,
+        'breast_cancer': BREAST_CANCER_SETTINGS,
         'mnist': MNIST_SETTINGS,
     }[args.dataset]
 
@@ -114,10 +116,23 @@ else:
     print('WARNING: proceeding with non-deterministic mode.')
 
 if args.dataset == 'colon_cancer':
-    ds = ColonCancerBagsCross(path="data/ColonCancer", train=True, shuffle_bag=True, data_augmentation=True, fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
-    ds_push = ColonCancerBagsCross(path="data/ColonCancer", train=True, push=True, shuffle_bag=True, fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
-    ds_valid = ColonCancerBagsCross(path="data/ColonCancer", train=False, all_labels=True, fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
-    ds_test = ColonCancerBagsCross(path="data/ColonCancer", train=False, test=True, all_labels=True, fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)                     
+    ds = ColonCancerBagsCross(path="data/ColonCancer", train=True, shuffle_bag=True, data_augmentation=True,
+                              fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+    ds_push = ColonCancerBagsCross(path="data/ColonCancer", train=True, push=True, shuffle_bag=True,
+                                   fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+    ds_valid = ColonCancerBagsCross(path="data/ColonCancer", train=False, all_labels=True, fold_id=config.fold_id,
+                                    folds=config.folds, random_state=config.random_state)
+    ds_test = ColonCancerBagsCross(path="data/ColonCancer", train=False, test=True, all_labels=True,
+                                   fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+elif args.dataset == 'breast_cancer':
+    ds = BreastCancerBagsCross(path="data/Bisque", train=True, shuffle_bag=True, data_augmentation=True,
+                               fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+    ds_push = BreastCancerBagsCross(path="data/Bisque", train=True, push=True, shuffle_bag=True,
+                                    fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+    ds_valid = BreastCancerBagsCross(path="data/Bisque", train=False, all_labels=True, fold_id=config.fold_id,
+                                     folds=config.folds, random_state=config.random_state)
+    ds_test = BreastCancerBagsCross(path="data/Bisque", train=False, test=True, all_labels=True,
+                                    fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
 elif args.dataset == 'mnist':
     ds = MnistBags(train=True, seed=seed, **config.dataset_settings)
     ds_push = MnistBags(train=True, push=True, seed=seed, **config.dataset_settings)
@@ -286,7 +301,8 @@ test_loader = torch.utils.data.DataLoader(
 # noinspection PyTypeChecker
 log_writer.add_text('dataset_stats',
                     'training set size: {}, push set size: {}, valid set size: {}, test set size: {}'.format(
-                        len(train_loader.dataset), len(train_push_loader.dataset), len(valid_loader.dataset), len(test_loader.dataset)),
+                        len(train_loader.dataset), len(train_push_loader.dataset), len(valid_loader.dataset),
+                        len(test_loader.dataset)),
                     global_step=step)
 log_writer.add_text('seed', str(seed), global_step=step)
 config_md = '\n'.join(
@@ -326,7 +342,8 @@ while True:
         train(model=ppnet, dataloader=train_loader, optimizer=warm_optimizer, config=config, log_writer=log_writer,
               step=step, weighting_attention=args.weighting_attention)
         warm_lr_scheduler.step()
-        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step,
+                     weighting_attention=args.weighting_attention)
         push_model_state_epoch = None
         epoch += 1
         if epoch >= config.push_start and epoch in config.push_epochs:
@@ -339,7 +356,8 @@ while True:
         train(model=ppnet, dataloader=train_loader, optimizer=joint_optimizer, config=config, log_writer=log_writer,
               step=step, weighting_attention=args.weighting_attention)
         joint_lr_scheduler.step()
-        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step,
+                     weighting_attention=args.weighting_attention)
         push_model_state_epoch = None
         if epoch >= config.push_start and epoch in config.push_epochs:
             mode = TrainMode.PUSH
@@ -359,7 +377,8 @@ while True:
             prototype_self_act_filename_prefix=prototype_self_act_filename_prefix,
             proto_bound_boxes_filename_prefix=proto_bound_boxes_filename_prefix,
             save_prototype_class_identity=True)
-        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step,
+                     weighting_attention=args.weighting_attention)
         push_model_state_epoch = epoch
         current_push_best_accu = 0.
         if config.mil_pooling == 'gated_attention' and not ppnet.mil_pooling == 'gated_attention':
@@ -376,7 +395,8 @@ while True:
         last_only(model=ppnet)
         train(model=ppnet, dataloader=train_loader, optimizer=last_layer_optimizer, config=config,
               log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
-        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+        accu = valid(model=ppnet, dataloader=valid_loader, config=config, log_writer=log_writer, step=step,
+                     weighting_attention=args.weighting_attention)
         iteration += 1
         push_model_state_epoch = epoch
         if iteration >= config.num_last_layer_iterations:
@@ -435,31 +455,34 @@ for i in config.push_epochs:
 path_to_model_with_max_push_acc = max(model_path_to_acc.items(), key=operator.itemgetter(1))[0]
 
 ppnet_test = construct_PPNet(base_architecture=config.base_architecture,
-                        pretrained=False,
-                        img_size=config.img_size,
-                        prototype_shape=config.prototype_shape,
-                        num_classes=config.num_classes,
-                        prototype_activation_function=config.prototype_activation_function,
-                        add_on_layers_type=config.add_on_layers_type,
-                        batch_norm_features=config.batch_norm_features)
+                             pretrained=False,
+                             img_size=config.img_size,
+                             prototype_shape=config.prototype_shape,
+                             num_classes=config.num_classes,
+                             prototype_activation_function=config.prototype_activation_function,
+                             add_on_layers_type=config.add_on_layers_type,
+                             batch_norm_features=config.batch_norm_features)
 
 print('load model from ' + path_to_model_with_max_push_acc)
 load_model_from_train_state(path_to_model_with_max_push_acc, ppnet_test)
 
 ppnet_test = ppnet_test.cuda()
 
-accu = test(model=ppnet_test, dataloader=test_loader, config=config, log_writer=log_writer, step=step, weighting_attention=args.weighting_attention)
+accu = test(model=ppnet_test, dataloader=test_loader, config=config, log_writer=log_writer, step=step,
+            weighting_attention=args.weighting_attention)
 
 epoch_for_ppnet_test = path_to_model_with_max_push_acc.split(".")[-7].split("/")[-1]
 
 log_writer.add_figure('test_prototype_analysis/positive',
-                        generate_prototype_activation_matrix(ppnet_test, test_loader, train_push_loader, epoch_for_ppnet_test,
-                                                            model_dir, torch.device('cuda'), bag_class=1)
-                        , global_step=step )
+                      generate_prototype_activation_matrix(ppnet_test, test_loader, train_push_loader,
+                                                           epoch_for_ppnet_test,
+                                                           model_dir, torch.device('cuda'), bag_class=1)
+                      , global_step=step)
 log_writer.add_figure('test_prototype_analysis/negative',
-                        generate_prototype_activation_matrix(ppnet_test, test_loader, train_push_loader, epoch_for_ppnet_test,
-                                                            model_dir, torch.device('cuda'), bag_class=0)
-                        , global_step=step)
+                      generate_prototype_activation_matrix(ppnet_test, test_loader, train_push_loader,
+                                                           epoch_for_ppnet_test,
+                                                           model_dir, torch.device('cuda'), bag_class=0)
+                      , global_step=step)
 
 best_model_path = os.path.join(model_dir, 'end')
 save_train_state(best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,

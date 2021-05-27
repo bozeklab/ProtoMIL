@@ -16,7 +16,7 @@ import utils_augemntation
 
 class ColonCancerBagsCross(data_utils.Dataset):
     def __init__(self, path, train=True, test=False, shuffle_bag=False,
-                 data_augmentation=False, loc_info=False, push=False, 
+                 data_augmentation=False, loc_info=False, push=False,
                  nucleus_type=None, folds=10, fold_id=1, seed=7, random_state=3, all_labels=False):
         self.path = path
         self.train = train
@@ -63,7 +63,7 @@ class ColonCancerBagsCross(data_utils.Dataset):
             if self.train:
                 val_indices = self.r.choice(folds[self.fold_id][0], len(folds[self.fold_id][1]))
                 indices = set(folds[self.fold_id][0]) - set(val_indices)
-            else: # valid
+            else:  # valid
                 indices = self.r.choice(folds[self.fold_id][0], len(folds[self.fold_id][1]))
 
         if nucleus_type:

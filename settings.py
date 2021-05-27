@@ -105,6 +105,44 @@ class Settings:
 MNIST_SETTINGS = Settings(
     base_architecture='resnet18_small',
     img_size=28,
+    prototype_number=20,
+    prototype_latent=64,
+    prototype_conv_dim=(2, 2),
+    joint_optimizer_lrs={
+        'features': 1e-4,
+        'add_on_layers': 3e-3,
+        'prototype_vectors': 3e-3,
+    },
+    joint_lr_step_size=5,
+    warm_optimizer_lrs={
+        'features': 3e-3,
+        'add_on_layers': 3e-3,
+        'prototype_vectors': 3e-3,
+        'attention': 3e-3,
+        'last_layer': 3e-3,
+    },
+    last_layer_optimizer_lr={
+        'attention': 1e-3,
+        'last_layer': 1e-4,
+    },
+    num_train_epochs=51,
+    num_warm_epochs=30,
+    num_last_layer_iterations=20,
+    push_start=30,
+    push_epochs=[i for i in range(200) if i % 10 == 0],
+    bag_length_mean=100,
+    bag_length_std=20,
+    bag_length_min=10,
+    bag_length_max=200,
+    num_bags_train=500,
+    num_bags_test=1000,
+    positive_samples_in_bag_ratio_mean=0.1,
+    positive_samples_in_bag_ratio_std=0.01,
+)
+
+COLON_CANCER_SETTINGS = Settings(
+    base_architecture='resnet18_small',
+    img_size=27,
     prototype_number=10,
     prototype_latent=64,
     prototype_conv_dim=(2, 2),
@@ -132,16 +170,16 @@ MNIST_SETTINGS = Settings(
     push_epochs=[i for i in range(200) if i % 10 == 0]
 )
 
-COLON_CANCER_SETTINGS = Settings(
+BREAST_CANCER_SETTINGS = Settings(
     base_architecture='resnet18_small',
-    img_size=27,
+    img_size=32,
     prototype_number=10,
-    prototype_latent=64,
+    prototype_latent=128,
     prototype_conv_dim=(2, 2),
     joint_optimizer_lrs={
-        'features': 1e-4,
-        'add_on_layers': 3e-3,
-        'prototype_vectors': 3e-3,
+        'features': 1e-5,
+        'add_on_layers': 3e-4,
+        'prototype_vectors': 3e-4,
     },
     joint_lr_step_size=5,
     warm_optimizer_lrs={
