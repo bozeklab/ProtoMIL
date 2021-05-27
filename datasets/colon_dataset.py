@@ -9,22 +9,30 @@ import torch
 import torch.utils.data as data_utils
 import torchvision.transforms as transforms
 from skimage import io, color
+from sklearn.model_selection import KFold
 
 import utils_augemntation
 
 
 class ColonCancerBagsCross(data_utils.Dataset):
-    def __init__(self, path, train_val_idxs=None, test_idxs=None, train=True, shuffle_bag=False,
-                 data_augmentation=False, loc_info=False, push=False, nucleus_type=None):
+    def __init__(self, path, train=True, test=False, shuffle_bag=False,
+                 data_augmentation=False, loc_info=False, push=False, 
+                 nucleus_type=None, folds=10, fold_id=1, seed=7, random_state=3, all_labels=False):
         self.path = path
-        self.train_val_idxs = train_val_idxs
-        self.test_idxs = test_idxs
         self.train = train
+        self.test = test
         self.shuffle_bag = shuffle_bag
         self.data_augmentation = data_augmentation
         self.location_info = loc_info
         self.push = push
         self.nucleus_type = nucleus_type
+        self.folds = folds
+        self.fold_id = fold_id
+        self.seed = seed
+        self.random_state = random_state
+        self.all_labels = all_labels
+
+        self.r = np.random.RandomState(seed)
 
         tr = [utils_augemntation.RandomHEStain(),
               utils_augemntation.HistoNormalize(),
@@ -45,28 +53,31 @@ class ColonCancerBagsCross(data_utils.Dataset):
 
         self.to_tensor_transform = transforms.Compose(psh)
 
-        self.dir_list_train, self.dir_list_test = self.split_dir_list(self.path, self.train_val_idxs, self.test_idxs)
-        if self.train:
-            if nucleus_type:
-                self.bag_list_train, self.labels_list_train = self.create_bags_one_type(self.dir_list_train)
-            else:
-                self.bag_list_train, self.labels_list_train = self.create_bags(self.dir_list_train)
+        self.dir_list = self.get_dir_list(self.path)
+
+        folds = list(KFold(n_splits=self.folds, shuffle=True, random_state=self.random_state).split(self.dir_list))
+
+        if self.test:
+            indices = set(folds[self.fold_id][1])
         else:
-            if nucleus_type:
-                self.bag_list_test, self.labels_list_test = self.create_bags_one_type(self.dir_list_test)
-            else:
-                self.bag_list_test, self.labels_list_test = self.create_bags(self.dir_list_test)
+            if self.train:
+                val_indices = self.r.choice(folds[self.fold_id][0], len(folds[self.fold_id][1]))
+                indices = set(folds[self.fold_id][0]) - set(val_indices)
+            else: # valid
+                indices = self.r.choice(folds[self.fold_id][0], len(folds[self.fold_id][1]))
+
+        if nucleus_type:
+            self.bag_list, self.labels_list = self.create_bags_one_type(np.asarray(self.dir_list)[list(indices)])
+        else:
+            self.bag_list, self.labels_list = self.create_bags(np.asarray(self.dir_list)[list(indices)])
 
     @staticmethod
-    def split_dir_list(path, train_val_idxs, test_idxs):
+    def get_dir_list(path):
         dirs = [x[0] for x in os.walk(path)]
         dirs.pop(0)
         dirs.sort()
 
-        dir_list_train = list(sorted([dirs[i] for i in train_val_idxs]))
-        dir_list_test = list(sorted([dirs[i] for i in test_idxs]))
-
-        return dir_list_train, dir_list_test
+        return dirs
 
     def create_bags_one_type(self, dir_list):
         """Create bags containing only one type of nucleus."""
@@ -282,9 +293,6 @@ class ColonCancerBagsCross(data_utils.Dataset):
                 bag_list.append(bag)
                 labels_list.append(labels)
 
-            # bag_list.append(bag)
-            # labels_list.append(labels)
-
         return bag_list, labels_list
 
     def transform_and_data_augmentation(self, bag, raw=False):
@@ -308,20 +316,18 @@ class ColonCancerBagsCross(data_utils.Dataset):
         return torch.stack(bag_tensors)
 
     def __len__(self):
-        if self.train:
-            return len(self.labels_list_train)
-        else:
-            return len(self.labels_list_test)
+        return len(self.labels_list)
 
     def __getitem__(self, index):
-        if self.train:
-            bag = self.bag_list_train[index]
-            label = max(self.labels_list_train[index])
+        bag = self.bag_list[index]
+
+        if self.all_labels:
+            label = torch.LongTensor(self.labels_list[index])
         else:
-            bag = self.bag_list_test[index]
-            label = max(self.labels_list_test[index])
+            label = torch.LongTensor(self.labels_list[index]).max().unsqueeze(0)
+
         if self.push:
             return self.transform_and_data_augmentation(bag, raw=True), self.transform_and_data_augmentation(
-                bag), torch.LongTensor([int(label)])
+                bag), label
         else:
-            return self.transform_and_data_augmentation(bag), torch.LongTensor([int(label)])
+            return self.transform_and_data_augmentation(bag), label

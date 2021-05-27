@@ -114,15 +114,10 @@ else:
     print('WARNING: proceeding with non-deterministic mode.')
 
 if args.dataset == 'colon_cancer':
-    split_val = 70
-    train_range, test_range = range(split_val), range(split_val, 100)
-    ds = ColonCancerBagsCross(path="data/ColonCancer", train=True, train_val_idxs=train_range, test_idxs=test_range,
-                              shuffle_bag=True, data_augmentation=True)
-    ds_push = ColonCancerBagsCross(path="data/ColonCancer", train=True, train_val_idxs=train_range,
-                                   test_idxs=test_range,
-                                   push=True, shuffle_bag=True)
-    ds_valid = ColonCancerBagsCross(path="data/ColonCancer", train=False, train_val_idxs=train_range,
-                                   test_idxs=test_range)
+    ds = ColonCancerBagsCross(path="data/ColonCancer", train=True, shuffle_bag=True, data_augmentation=True, fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+    ds_push = ColonCancerBagsCross(path="data/ColonCancer", train=True, push=True, shuffle_bag=True, fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+    ds_valid = ColonCancerBagsCross(path="data/ColonCancer", train=False, all_labels=True, fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+    ds_test = ColonCancerBagsCross(path="data/ColonCancer", train=False, test=True, all_labels=True, fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)                     
 elif args.dataset == 'mnist':
     ds = MnistBags(train=True, seed=seed, **config.dataset_settings)
     ds_push = MnistBags(train=True, push=True, seed=seed, **config.dataset_settings)
