@@ -36,7 +36,7 @@ class BreastCancerBagsCross(data_utils.Dataset):
                                                                    utils_augemntation.RandomRotate(),
                                                                    transforms.RandomVerticalFlip(),
                                                                    transforms.RandomHorizontalFlip(),
-                                                                   transforms.RandomCrop(32, padding=(6, 6),
+                                                                   transforms.RandomCrop(32, padding=(3, 3),
                                                                                          padding_mode='reflect'),
                                                                    transforms.ToTensor(),
                                                                    ])

@@ -2,7 +2,8 @@ from enum import Enum
 
 import numpy as np
 import torch
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_auc_score
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_auc_score, precision_score, recall_score, \
+    f1_score
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as func
 
@@ -158,6 +159,10 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     preds = np.concatenate(preds)
     targets = np.concatenate(targets)
     auc = roc_auc_score(targets, preds[..., 1])
+    pred_y = preds.argmax(1)
+    precision = precision_score(targets, pred_y)
+    recall = recall_score(targets, pred_y)
+    f1 = f1_score(targets, pred_y)
 
     print('\t\taccuracy:', n_correct / n_examples)
     print('\t\tauc:', auc)
@@ -184,6 +189,9 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
 
         log_writer.add_scalar('accuracy' + suffix, n_correct / n_examples, global_step=step)
         log_writer.add_scalar('auc' + suffix, auc, global_step=step)
+        log_writer.add_scalar('precision' + suffix, precision, global_step=step)
+        log_writer.add_scalar('recall' + suffix, recall, global_step=step)
+        log_writer.add_scalar('f-score' + suffix, f1, global_step=step)
         log_writer.add_scalar('l1' + suffix, model.last_layer.weight.norm(p=1).item(), global_step=step)
         conf_plot = ConfusionMatrixDisplay(confusion_matrix=conf_matrix).plot(cmap='Blues', values_format='d')
         log_writer.add_figure('confusion_matrix' + suffix, conf_plot.figure_, global_step=step, close=True)
