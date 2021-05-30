@@ -446,13 +446,15 @@ while True:
 
 # test
 # find push with max accuracy
-model_path_to_acc = {}
+score_model_with_max_push_acc = -1
+path_to_model_with_max_push_acc = None
 for i in config.push_epochs:
     if i >= config.push_start and i < config.num_train_epochs:
         model_push_path = glob.glob(model_dir + f"/{i}*")[0]
-        model_path_to_acc[model_push_path] = float(".".join(model_push_path.split(".")[-3:-1]))
-
-path_to_model_with_max_push_acc = max(model_path_to_acc.items(), key=operator.itemgetter(1))[0]
+        score = float(".".join(model_push_path.split(".")[-3:-1]))
+        if score >= score_model_with_max_push_acc:
+            score_model_with_max_push_acc = score
+            path_to_model_with_max_push_acc = model_push_path
 
 ppnet_test = construct_PPNet(base_architecture=config.base_architecture,
                              pretrained=False,

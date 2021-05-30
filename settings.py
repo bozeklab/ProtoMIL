@@ -197,7 +197,7 @@ BREAST_CANCER_SETTINGS = Settings(
         'attention': 1e-3,
         'last_layer': 1e-4,
     },
-    num_train_epochs=101,
+    num_train_epochs=91,
     num_warm_epochs=60,
     num_last_layer_iterations=20,
     push_start=60,
