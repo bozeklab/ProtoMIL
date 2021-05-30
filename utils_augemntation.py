@@ -1,4 +1,6 @@
 """Collection of functions for data augmentation of PIL images"""
+import warnings
+
 import numpy as np
 import numpy.random as random
 import skimage
@@ -97,7 +99,10 @@ def normalize(image, target=None):
     imagelab[:, :, 2] = imageB
 
     # Back to RGB space
-    returnimage = color.lab2rgb(imagelab)
+    with warnings.catch_warnings():
+        # We expect some pixes to be beyond rgb scale.
+        warnings.simplefilter('ignore')
+        returnimage = color.lab2rgb(imagelab)
     returnimage = np.clip(returnimage, 0, 1)
     returnimage *= 255
     # Replace white pixels

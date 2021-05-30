@@ -2,12 +2,13 @@
 
 import random
 
+import matplotlib.pyplot as plt
 import numpy as np
 from skimage import io, color
 import torch
 import torch.utils.data as data_utils
 import torchvision.transforms as transforms
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, StratifiedKFold
 
 import utils_augemntation
 from skimage.util import view_as_blocks
@@ -33,8 +34,10 @@ class BreastCancerBagsCross(data_utils.Dataset):
         self.data_augmentation_img_transform = transforms.Compose([utils_augemntation.RandomHEStain(),
                                                                    utils_augemntation.HistoNormalize(),
                                                                    utils_augemntation.RandomRotate(),
-                                                                   utils_augemntation.RandomVerticalFlip(),
+                                                                   transforms.RandomVerticalFlip(),
                                                                    transforms.RandomHorizontalFlip(),
+                                                                   transforms.RandomCrop(32, padding=(6, 6),
+                                                                                         padding_mode='reflect'),
                                                                    transforms.ToTensor(),
                                                                    ])
 
@@ -45,7 +48,9 @@ class BreastCancerBagsCross(data_utils.Dataset):
 
         self.dir_list = self.get_dir_list(self.path)
 
-        folds = list(KFold(n_splits=self.folds, shuffle=True, random_state=self.random_state).split(self.dir_list))
+        folds = list(
+            StratifiedKFold(n_splits=self.folds, shuffle=True, random_state=self.random_state).split(self.dir_list, [
+                1 if 'malignant' in d else 0 for d in self.dir_list]))
 
         if self.test:
             indices = set(folds[self.fold_id][1])
@@ -120,3 +125,16 @@ class BreastCancerBagsCross(data_utils.Dataset):
                 bag), label
         else:
             return self.transform_and_data_augmentation(bag), label
+
+
+if __name__ == '__main__':
+    ds = BreastCancerBagsCross(path="../data/Bisque", train=False, all_labels=True, fold_id=1,
+                               folds=10, random_state=3, push=True)
+    for i, (raw, proc, _) in enumerate(ds):
+        for idx, (r, p) in enumerate(zip(raw, proc)):
+            fig, (ax1, ax2) = plt.subplots(1, 2)
+            ax1.set_title('raw')
+            ax1.imshow(r.permute(1, 2, 0))
+            ax2.set_title('processed')
+            ax2.imshow(p.permute(1, 2, 0))
+            fig.savefig('../test/{}_{}.jpg'.format(i, idx))

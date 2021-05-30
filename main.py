@@ -230,7 +230,7 @@ last_layer_optimizer_specs = [
 joint_optimizer = torch.optim.Adam(joint_optimizer_specs)
 joint_lr_scheduler = torch.optim.lr_scheduler.StepLR(joint_optimizer, step_size=config.joint_lr_step_size, gamma=0.1)
 warm_optimizer = torch.optim.Adam(warm_optimizer_specs)
-warm_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(warm_optimizer, gamma=0.9)
+warm_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(warm_optimizer, gamma=config.warm_lr_gamma)
 last_layer_optimizer = torch.optim.Adam(last_layer_optimizer_specs)
 
 other_state = {
