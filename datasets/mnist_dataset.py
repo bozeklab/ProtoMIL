@@ -3,7 +3,6 @@
 import numpy as np
 import torch
 import torch.utils.data as data_utils
-from PIL import Image
 from sklearn.model_selection import KFold
 from torch.utils.data import ConcatDataset
 from torchvision import datasets, transforms
@@ -12,12 +11,12 @@ from torchvision import datasets, transforms
 class MnistBags(data_utils.Dataset):
     def __init__(self, target_number=9, bag_length_mean=200, bag_length_std=150, bag_length_min=50, bag_length_max=600,
                  positive_samples_in_bag_ratio_mean=0.1, positive_samples_in_bag_ratio_std=0.01,
-                 num_bags_train=300, num_bags_test=300, seed=7, folds=10, fold_id=0, random_state=3, train=True, push=False, test=False, all_labels=False):
+                 num_bags_train=300, num_bags_test=300, folds=10, fold_id=0, random_state=3, train=True, push=False,
+                 test=False, all_labels=False):
         self.target_number = target_number
         self.mean_bag_length = bag_length_mean
         self.var_bag_length = bag_length_std
         self.num_bag = num_bags_train if train else num_bags_test
-        self.seed = seed
         self.train = train
         self.push = push
         self.test = test
@@ -32,7 +31,7 @@ class MnistBags(data_utils.Dataset):
         self.target_numbers_in_pos_bag_mean = positive_samples_in_bag_ratio_mean
         self.target_numbers_in_pos_bag_std = positive_samples_in_bag_ratio_std
 
-        self.r = np.random.RandomState(seed)
+        self.r = np.random.RandomState(random_state)
 
         self.pil_to_rgb_tensor = transforms.Compose([
             transforms.Lambda(lambda x: x.convert('RGB')),
@@ -60,7 +59,7 @@ class MnistBags(data_utils.Dataset):
             if self.train:
                 val_indices = self.r.choice(folds[self.fold_id][0], len(folds[self.fold_id][1]))
                 indices = set(folds[self.fold_id][0]) - set(val_indices)
-            else: # valid
+            else:  # valid
                 indices = self.r.choice(folds[self.fold_id][0], len(folds[self.fold_id][1]))
 
         negative_samples = torch.stack(

@@ -1,12 +1,11 @@
 import argparse
 import datetime
 import getpass
+import glob
 import os
 import platform
 import random
 import sys
-import glob
-import operator
 
 import matplotlib
 import numpy
@@ -117,27 +116,27 @@ else:
 
 if args.dataset == 'colon_cancer':
     ds = ColonCancerBagsCross(path="data/ColonCancer", train=True, shuffle_bag=True, data_augmentation=True,
-                              fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+                              fold_id=config.fold_id, folds=config.folds, random_state=seed)
     ds_push = ColonCancerBagsCross(path="data/ColonCancer", train=True, push=True, shuffle_bag=True,
-                                   fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+                                   fold_id=config.fold_id, folds=config.folds, random_state=seed)
     ds_valid = ColonCancerBagsCross(path="data/ColonCancer", train=False, all_labels=True, fold_id=config.fold_id,
-                                    folds=config.folds, random_state=config.random_state)
+                                    folds=config.folds, random_state=seed)
     ds_test = ColonCancerBagsCross(path="data/ColonCancer", train=False, test=True, all_labels=True,
-                                   fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+                                   fold_id=config.fold_id, folds=config.folds, random_state=seed)
 elif args.dataset == 'breast_cancer':
     ds = BreastCancerBagsCross(path="data/Bisque", train=True, shuffle_bag=True, data_augmentation=True,
-                               fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+                               fold_id=config.fold_id, folds=config.folds, random_state=seed)
     ds_push = BreastCancerBagsCross(path="data/Bisque", train=True, push=True, shuffle_bag=True,
-                                    fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+                                    fold_id=config.fold_id, folds=config.folds, random_state=seed)
     ds_valid = BreastCancerBagsCross(path="data/Bisque", train=False, all_labels=True, fold_id=config.fold_id,
-                                     folds=config.folds, random_state=config.random_state)
+                                     folds=config.folds, random_state=seed)
     ds_test = BreastCancerBagsCross(path="data/Bisque", train=False, test=True, all_labels=True,
-                                    fold_id=config.fold_id, folds=config.folds, random_state=config.random_state)
+                                    fold_id=config.fold_id, folds=config.folds, random_state=seed)
 elif args.dataset == 'mnist':
-    ds = MnistBags(train=True, seed=seed, **config.dataset_settings)
-    ds_push = MnistBags(train=True, push=True, seed=seed, **config.dataset_settings)
-    ds_valid = MnistBags(train=False, seed=seed, **config.dataset_settings, all_labels=True)
-    ds_test = MnistBags(train=False, test=True, seed=seed, **config.dataset_settings, all_labels=True)
+    ds = MnistBags(train=True, random_state=seed, **config.dataset_settings)
+    ds_push = MnistBags(train=True, push=True, random_state=seed, **config.dataset_settings)
+    ds_valid = MnistBags(train=False, random_state=seed, **config.dataset_settings, all_labels=True)
+    ds_test = MnistBags(train=False, test=True, random_state=seed, **config.dataset_settings, all_labels=True)
 else:
     raise NotImplementedError()
 

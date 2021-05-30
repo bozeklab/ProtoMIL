@@ -4,32 +4,31 @@ import random
 
 import matplotlib.pyplot as plt
 import numpy as np
-from skimage import io, color
 import torch
 import torch.utils.data as data_utils
 import torchvision.transforms as transforms
-from sklearn.model_selection import KFold, StratifiedKFold
+from skimage import io, color
+from skimage.util import view_as_blocks
+from sklearn.model_selection import StratifiedKFold
 
 import utils_augemntation
-from skimage.util import view_as_blocks
 
 
 class BreastCancerBagsCross(data_utils.Dataset):
     def __init__(self, path, train=True, test=False, push=False, shuffle_bag=False, data_augmentation=False,
-                 loc_info=False, folds=10, fold_id=1, seed=7, random_state=3, all_labels=False):
+                 loc_info=False, folds=10, fold_id=1, random_state=3, all_labels=False):
         self.path = path
         self.train = train
         self.test = test
         self.folds = folds
         self.fold_id = fold_id
-        self.seed = seed
         self.random_state = random_state
         self.push = push
         self.all_labels = all_labels
         self.shuffle_bag = shuffle_bag
         self.data_augmentation = data_augmentation
         self.location_info = loc_info
-        self.r = np.random.RandomState(seed)
+        self.r = np.random.RandomState(random_state)
 
         self.data_augmentation_img_transform = transforms.Compose([utils_augemntation.RandomHEStain(),
                                                                    utils_augemntation.HistoNormalize(),

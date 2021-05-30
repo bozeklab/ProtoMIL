@@ -17,7 +17,7 @@ import utils_augemntation
 class ColonCancerBagsCross(data_utils.Dataset):
     def __init__(self, path, train=True, test=False, shuffle_bag=False,
                  data_augmentation=False, loc_info=False, push=False,
-                 nucleus_type=None, folds=10, fold_id=1, seed=7, random_state=3, all_labels=False):
+                 nucleus_type=None, folds=10, fold_id=1, random_state=3, all_labels=False):
         self.path = path
         self.train = train
         self.test = test
@@ -28,11 +28,10 @@ class ColonCancerBagsCross(data_utils.Dataset):
         self.nucleus_type = nucleus_type
         self.folds = folds
         self.fold_id = fold_id
-        self.seed = seed
         self.random_state = random_state
         self.all_labels = all_labels
 
-        self.r = np.random.RandomState(seed)
+        self.r = np.random.RandomState(random_state)
 
         tr = [utils_augemntation.RandomHEStain(),
               utils_augemntation.HistoNormalize(),

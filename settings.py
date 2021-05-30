@@ -47,7 +47,6 @@ class Settings:
     positive_samples_in_bag_ratio_std: float = 0.25
     folds: int = 10
     fold_id: int = 0
-    random_state: int = 3
 
     random_seed_presets: List[int] = dataclasses.field(
         default_factory=lambda: [631056511, 923928841, 53306087, 937272127, 207121037])
@@ -197,7 +196,7 @@ BREAST_CANCER_SETTINGS = Settings(
         'attention': 1e-3,
         'last_layer': 1e-4,
     },
-    num_train_epochs=91,
+    num_train_epochs=101,
     num_warm_epochs=60,
     num_last_layer_iterations=20,
     push_start=60,
