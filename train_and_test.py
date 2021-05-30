@@ -160,9 +160,9 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     targets = np.concatenate(targets)
     auc = roc_auc_score(targets, preds[..., 1])
     pred_y = preds.argmax(1)
-    precision = precision_score(targets, pred_y)
-    recall = recall_score(targets, pred_y)
-    f1 = f1_score(targets, pred_y)
+    precision = precision_score(targets, pred_y, zero_division=0)
+    recall = recall_score(targets, pred_y, zero_division=0)
+    f1 = f1_score(targets, pred_y, zero_division=0)
 
     print('\t\taccuracy:', n_correct / n_examples)
     print('\t\tauc:', auc)
