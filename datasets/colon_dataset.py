@@ -36,8 +36,10 @@ class ColonCancerBagsCross(data_utils.Dataset):
         tr = [utils_augemntation.RandomHEStain(),
               utils_augemntation.HistoNormalize(),
               utils_augemntation.RandomRotate(),
-              utils_augemntation.RandomVerticalFlip(),
+              transforms.RandomVerticalFlip(),
               transforms.RandomHorizontalFlip(),
+              transforms.RandomCrop(27, padding=(3, 3), padding_mode='reflect'),
+              transforms.RandomRotation(15),
               transforms.ToTensor()
               ]
         tst = [utils_augemntation.HistoNormalize(),

@@ -489,6 +489,7 @@ best_model_path = os.path.join(model_dir, 'end')
 save_train_state(best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
                  best_accu, current_push_best_accu, accu, config)
 [os.remove(checkpoint) for checkpoint in get_state_path_for_prefix(checkpoint_file_prefix)]
+log_writer.flush()
 log_writer.close()
 
 if args.alloc:

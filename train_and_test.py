@@ -2,8 +2,9 @@ from enum import Enum
 
 import numpy as np
 import torch
+from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_auc_score, precision_score, recall_score, \
-    f1_score
+    f1_score, roc_curve
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as func
 
@@ -74,10 +75,10 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
                             * model.prototype_shape[3])
 
                 # prototypes_of_correct_class is a tensor of shape batch_size * num_prototypes
-                
+
                 attention_detached = attention.detach().cpu()
                 weight = np.interp(attention_detached, (attention_detached.min(), attention_detached.max()), (0.001, 1))
-                
+
                 if weighting_attention:
                     tensor_weight = torch.tensor(weight).cuda()
                 else:
@@ -85,7 +86,8 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
 
                 # calculate cluster cost
                 prototypes_of_correct_class = torch.t(model.prototype_class_identity[:, label]).cuda()
-                inverted_distances, _ = torch.max((max_dist - (min_distances * tensor_weight.T)) * prototypes_of_correct_class, dim=1)
+                inverted_distances, _ = torch.max(
+                    (max_dist - (min_distances * tensor_weight.T)) * prototypes_of_correct_class, dim=1)
                 cluster_cost = torch.mean(max_dist - inverted_distances)
 
                 # calculate separation cost
@@ -96,8 +98,9 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
 
                 # calculate avg cluster cost
                 avg_separation_cost = \
-                    torch.sum((min_distances * tensor_weight.T) * prototypes_of_wrong_class, dim=1) / torch.sum(prototypes_of_wrong_class,
-                                                                                            dim=1)
+                    torch.sum((min_distances * tensor_weight.T) * prototypes_of_wrong_class, dim=1) / torch.sum(
+                        prototypes_of_wrong_class,
+                        dim=1)
                 avg_separation_cost = torch.mean(avg_separation_cost)
 
                 if use_l1_mask:
@@ -163,6 +166,7 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     precision = precision_score(targets, pred_y, zero_division=0)
     recall = recall_score(targets, pred_y, zero_division=0)
     f1 = f1_score(targets, pred_y, zero_division=0)
+    fpr, tpr, threshold = roc_curve(targets, preds[..., 1])
 
     print('\t\taccuracy:', n_correct / n_examples)
     print('\t\tauc:', auc)
@@ -196,6 +200,18 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
         conf_plot = ConfusionMatrixDisplay(confusion_matrix=conf_matrix).plot(cmap='Blues', values_format='d')
         log_writer.add_figure('confusion_matrix' + suffix, conf_plot.figure_, global_step=step, close=True)
 
+        plt.figure()
+        plt.title('Receiver Operating Characteristic')
+        plt.plot(fpr, tpr, 'b', label='AUC = %0.2f' % auc)
+        plt.legend(loc='lower right')
+        plt.plot([0, 1], [0, 1], 'r--')
+        plt.xlim([0, 1])
+        plt.ylim([0, 1])
+        plt.ylabel('True Positive Rate')
+        plt.xlabel('False Positive Rate')
+        log_writer.add_figure('roc' + suffix, plt.gcf(), global_step=step, close=True)
+
+
     p = model.prototype_vectors.view(model.num_prototypes, -1).cpu()
     with torch.no_grad():
         p_avg_pair_dist = torch.mean(list_of_distances(p, p))
@@ -215,13 +231,17 @@ def train(model, dataloader, optimizer, config: Settings, log_writer: SummaryWri
     return _train_or_test(model=model, dataloader=dataloader, config=config, optimizer=optimizer,
                           log_writer=log_writer, step=step, weighting_attention=weighting_attention)
 
-def valid(model, dataloader, config: Settings, log_writer: SummaryWriter = None, step: int = 0, weighting_attention=False):
+
+def valid(model, dataloader, config: Settings, log_writer: SummaryWriter = None, step: int = 0,
+          weighting_attention=False):
     print('\tvalid')
     model.eval()
     return _train_or_test(model=model, dataloader=dataloader, config=config, optimizer=None,
                           log_writer=log_writer, step=step, weighting_attention=weighting_attention, is_valid=True)
 
-def test(model, dataloader, config: Settings, log_writer: SummaryWriter = None, step: int = 0, weighting_attention=False):
+
+def test(model, dataloader, config: Settings, log_writer: SummaryWriter = None, step: int = 0,
+         weighting_attention=False):
     print('\ttest')
     model.eval()
     return _train_or_test(model=model, dataloader=dataloader, config=config, optimizer=None,
