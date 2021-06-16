@@ -15,6 +15,7 @@ class Settings:
     joint_lr_step_size: int
     warm_optimizer_lrs: dict
     warm_lr_gamma: float
+    joint_lr_gamma: float
     last_layer_optimizer_lr: dict
 
     num_train_epochs: int
@@ -114,6 +115,7 @@ MNIST_SETTINGS = Settings(
         'prototype_vectors': 3e-3,
     },
     joint_lr_step_size=5,
+    joint_lr_gamma=0.1,
     warm_optimizer_lrs={
         'features': 3e-3,
         'add_on_layers': 3e-3,
@@ -121,7 +123,7 @@ MNIST_SETTINGS = Settings(
         'attention': 3e-3,
         'last_layer': 3e-3,
     },
-    warm_lr_gamma=0.9,
+    warm_lr_gamma=0.95,
     last_layer_optimizer_lr={
         'attention': 1e-3,
         'last_layer': 1e-4,
@@ -153,6 +155,7 @@ COLON_CANCER_SETTINGS = Settings(
         'prototype_vectors': 1e-5,
     },
     joint_lr_step_size=10,
+    joint_lr_gamma=0.3,
     warm_optimizer_lrs={
         'features': 1e-2,
         'add_on_layers': 1e-2,
@@ -165,10 +168,10 @@ COLON_CANCER_SETTINGS = Settings(
         'attention': 1e-3,
         'last_layer': 1e-4,
     },
-    num_train_epochs=121,
-    num_warm_epochs=80,
+    num_train_epochs=181,
+    num_warm_epochs=100,
     num_last_layer_iterations=20,
-    push_start=80,
+    push_start=100,
     push_epochs=[i for i in range(200) if i % 20 == 0]
 )
 
@@ -184,6 +187,7 @@ BREAST_CANCER_SETTINGS = Settings(
         'prototype_vectors': 1e-5,
     },
     joint_lr_step_size=10,
+    joint_lr_gamma=0.1,
     warm_optimizer_lrs={
         'features': 1e-2,
         'add_on_layers': 1e-2,
