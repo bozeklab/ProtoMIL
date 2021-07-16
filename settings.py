@@ -1,6 +1,6 @@
 import dataclasses
 from dataclasses import dataclass
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,8 @@ class Settings:
     random_seed_id: int = 0
     # overrides random seed preset and id.
     random_seed_value = None
+
+    noop_features_size: Optional[Tuple[int, int, int]] = None
 
     @property
     def coefs(self):
@@ -205,4 +207,37 @@ BREAST_CANCER_SETTINGS = Settings(
     num_last_layer_iterations=20,
     push_start=60,
     push_epochs=[i for i in range(200) if i % 20 == 0]
+)
+
+CAMELYON_SETTINGS = Settings(
+    base_architecture='noop',
+    img_size=224,
+    noop_features_size=(512, 7, 7),
+    prototype_number=20,
+    prototype_latent=128,
+    prototype_conv_dim=(2, 2),
+    joint_optimizer_lrs={
+        'features': 1e-5,
+        'add_on_layers': 1e-5,
+        'prototype_vectors': 1e-5,
+    },
+    joint_lr_step_size=10,
+    joint_lr_gamma=0.1,
+    warm_optimizer_lrs={
+        'features': 1e-3,
+        'add_on_layers': 1e-3,
+        'prototype_vectors': 1e-3,
+        'attention': 1e-3,
+        'last_layer': 1e-3,
+    },
+    warm_lr_gamma=0.97,
+    last_layer_optimizer_lr={
+        'attention': 1e-3,
+        'last_layer': 1e-4,
+    },
+    num_train_epochs=101,
+    num_warm_epochs=40,
+    num_last_layer_iterations=20,
+    push_start=40,
+    push_epochs=[i for i in range(200) if i % 10 == 0]
 )

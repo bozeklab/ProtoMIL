@@ -15,14 +15,15 @@ from torchinfo import summary
 
 from analysis import generate_prototype_activation_matrix
 from datasets.breast_dataset import BreastCancerBagsCross
+from datasets.camelyon_dataset import CamelyonPreprocessedBagsCross
 from datasets.colon_dataset import ColonCancerBagsCross
 from datasets.mnist_dataset import MnistBags
 from helpers import makedir, str2bool
 from model import construct_PPNet
 from push import push_prototypes
-from save import load_train_state, save_train_state, get_state_path_for_prefix, snapshot_code, \
-    load_config_from_train_state, load_model_from_train_state
-from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS, Settings, BREAST_CANCER_SETTINGS
+from save import load_train_state, save_train_state, get_state_path_for_prefix, load_config_from_train_state, \
+    load_model_from_train_state, snapshot_code
+from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS, Settings, BREAST_CANCER_SETTINGS, CAMELYON_SETTINGS
 from train_and_test import warm_only, train, joint, test, last_only, TrainMode, valid
 
 matplotlib.use('Agg')
@@ -36,13 +37,13 @@ if DEBUG:
 CHECKPOINT_PREFIX = 'checkpoint'
 LOGS_DIR = 'runs'
 SAVED_MODELS_PATH = 'saved_models'
-CHECKPOINT_FREQUENCY_STEPS = 3
+CHECKPOINT_FREQUENCY_STEPS = 1
 
 # noinspection PyTypeChecker
 parser = argparse.ArgumentParser(prog='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpuid', type=int, default=0, help='CUDA device id to use')
-parser.add_argument('-d', '--dataset', type=str, required=True, choices=['mnist', 'colon_cancer', 'breast_cancer'],
-                    help='Select dataset')
+parser.add_argument('-d', '--dataset', type=str, required=True, choices=['mnist', 'colon_cancer', 'breast_cancer',
+                                                                         'camelyon'], help='Select dataset')
 parser.add_argument('-n', '--new_experiment', default=False, action='store_true',
                     help='Overwrite any saved state and start a new experiment (saved checkpoint will be lost)')
 parser.add_argument('-l', '--load_state', metavar='STATE_FILE', type=str, default=None,
@@ -83,6 +84,7 @@ if config is None:
         'colon_cancer': COLON_CANCER_SETTINGS,
         'breast_cancer': BREAST_CANCER_SETTINGS,
         'mnist': MNIST_SETTINGS,
+        'camelyon': CAMELYON_SETTINGS,
     }[args.dataset]
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpuid)
@@ -137,6 +139,17 @@ elif args.dataset == 'mnist':
     ds_push = MnistBags(train=True, push=True, random_state=seed, **config.dataset_settings)
     ds_valid = MnistBags(train=False, random_state=seed, **config.dataset_settings, all_labels=True)
     ds_test = MnistBags(train=False, test=True, random_state=seed, **config.dataset_settings, all_labels=True)
+elif args.dataset == 'camelyon':
+    ds = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=True, shuffle_bag=True,
+                                       data_augmentation=True,
+                                       fold_id=config.fold_id, folds=config.folds, random_state=seed)
+    ds_push = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=True, push=True, shuffle_bag=True,
+                                            fold_id=config.fold_id, folds=config.folds, random_state=seed)
+    ds_valid = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=False, all_labels=True,
+                                             fold_id=config.fold_id,
+                                             folds=config.folds, random_state=seed)
+    ds_test = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=False, test=True, all_labels=True,
+                                            fold_id=config.fold_id, folds=config.folds, random_state=seed)
 else:
     raise NotImplementedError()
 
@@ -154,8 +167,12 @@ ppnet = construct_PPNet(base_architecture=config.base_architecture,
                         mil_pooling=config.mil_pooling)
 ppnet = ppnet.cuda()
 
-summary(ppnet, (10, 3, config.img_size, config.img_size), col_names=("input_size", "output_size", "num_params"),
-        depth=4)
+if config.base_architecture != 'noop':
+    summary(ppnet, (10, 3, config.img_size, config.img_size), col_names=("input_size", "output_size", "num_params"),
+            depth=4)
+else:
+    summary(ppnet, (10, *config.noop_features_size), col_names=("input_size", "output_size", "num_params"),
+            depth=4)
 
 joint_optimizer_specs = [
     {
@@ -279,7 +296,7 @@ prototype_img_filename_prefix = 'prototype-img'
 prototype_self_act_filename_prefix = 'prototype-self-act'
 proto_bound_boxes_filename_prefix = 'bb'
 
-workers = 0 if DEBUG else 8
+workers = 0 if DEBUG else 6
 
 train_loader = torch.utils.data.DataLoader(
     ds, batch_size=None, shuffle=True,
@@ -400,14 +417,15 @@ while True:
         iteration += 1
         push_model_state_epoch = epoch
         if iteration >= config.num_last_layer_iterations:
-            log_writer.add_figure('prototype_analysis/positive',
-                                  generate_prototype_activation_matrix(ppnet, valid_loader, train_push_loader, epoch,
-                                                                       model_dir, torch.device('cuda'), bag_class=1)
-                                  , global_step=step)
-            log_writer.add_figure('prototype_analysis/negative',
-                                  generate_prototype_activation_matrix(ppnet, valid_loader, train_push_loader, epoch,
-                                                                       model_dir, torch.device('cuda'), bag_class=0)
-                                  , global_step=step)
+            if args.dataset != 'camelyon':
+                log_writer.add_figure('prototype_analysis/positive',
+                                      generate_prototype_activation_matrix(ppnet, valid_loader, train_push_loader, epoch,
+                                                                           model_dir, torch.device('cuda'), bag_class=1)
+                                      , global_step=step)
+                log_writer.add_figure('prototype_analysis/negative',
+                                      generate_prototype_activation_matrix(ppnet, valid_loader, train_push_loader, epoch,
+                                                                           model_dir, torch.device('cuda'), bag_class=0)
+                                      , global_step=step)
             iteration = None
             epoch += 1
             mode = TrainMode.JOINT

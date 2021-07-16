@@ -224,7 +224,7 @@ class ResNet_features(nn.Module):
         template = 'resnet{}_features'
         return template.format(self.num_layers() + 1)
 
-def resnet18_features(pretrained=False, **kwargs):
+def resnet18_features(pretrained=False, batch_norm=True, **kwargs):
     """Constructs a ResNet-18 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet

@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from base_models.lenet_features import lenet5_features
+from base_models.noop_features import noop_features
 from base_models.resnet_features import resnet18_features, resnet34_features, resnet50_features, resnet101_features, \
     resnet152_features
 from base_models.densenet_features import densenet121_features, densenet161_features, densenet169_features, \
@@ -35,6 +36,7 @@ base_architecture_to_features = {
     'vgg19': vgg19_features,
     'vgg19_bn': vgg19_bn_features,
     'lenet5': lenet5_features,
+    'noop': noop_features,
 }
 
 
@@ -97,6 +99,9 @@ class PPNet(nn.Module):
             first_add_on_layer_in_channels = \
                 [i for i in features.modules() if isinstance(
                     i, nn.Conv2d)][-1].out_channels
+        elif features_name.startswith('NOOP'):
+            first_add_on_layer_in_channels = 512
+            # TODO: as param
         elif features_name.startswith('DENSE'):
             first_add_on_layer_in_channels = \
                 [i for i in features.modules() if isinstance(

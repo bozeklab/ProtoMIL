@@ -125,7 +125,8 @@ def update_prototypes_on_batch(search_batch_raw,
     prototype_network_parallel.eval()
 
     # Use bag y as batch y
-    search_y = search_y.repeat(search_batch_raw.shape[0])
+    search_y = search_y.repeat(search_batch_preprocessed.shape[0])
+    raw_sample = search_batch_raw[0]
 
     with torch.no_grad():
         search_batch_preprocessed = search_batch_preprocessed.cuda()
@@ -196,7 +197,7 @@ def update_prototypes_on_batch(search_batch_raw,
             # get the receptive field boundary of the image patch
             # that generates the representation
             protoL_rf_info = prototype_network_parallel.proto_layer_rf_info
-            rf_prototype_j = compute_rf_prototype(search_batch_preprocessed.size(2), batch_argmin_proto_dist_j,
+            rf_prototype_j = compute_rf_prototype(raw_sample.size(1), batch_argmin_proto_dist_j,
                                                   protoL_rf_info)
 
             # get the whole image

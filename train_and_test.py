@@ -7,6 +7,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_auc_sc
     f1_score, roc_curve
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as func
+from tqdm import tqdm
 
 from focalloss import FocalLoss
 from helpers import list_of_distances
@@ -49,110 +50,112 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     else:
         raise NotImplementedError('unknown loss function: ' + config.loss_function)
 
-    for i, (image, label) in enumerate(dataloader):
-        input = image.cuda()
+    with tqdm(total=len(dataloader.dataset), unit='bag') as pbar:
+        for i, (image, label) in enumerate(dataloader):
+            input = image.cuda()
 
-        # if param all_labels=True in dataloader, set label to positive if at least one in the list
-        if len(label) > 1:
-            label = label.max().unsqueeze(0)
+            # if param all_labels=True in dataloader, set label to positive if at least one in the list
+            if len(label) > 1:
+                label = label.max().unsqueeze(0)
 
-        target = label.cuda()
+            target = label.cuda()
 
-        # torch.enable_grad() has no effect outside of no_grad()
-        grad_req = torch.enable_grad() if is_train else torch.no_grad()
-        with grad_req:
-            output, min_distances, attention, _ = model.forward_(input)
+            # torch.enable_grad() has no effect outside of no_grad()
+            grad_req = torch.enable_grad() if is_train else torch.no_grad()
+            with grad_req:
+                output, min_distances, attention, _ = model.forward_(input)
 
-            cross_entropy = loss_fn(output, target)
-            if config.mil_pooling == 'loss_attention':
-                instance_labels = target * torch.ones(input.size(0), dtype=torch.long, device=input.device)
-                loss_2 = WeightCrossEntropyLoss()(model.out_c, instance_labels, model.A)
-                cross_entropy += 2.0 * loss_2
+                cross_entropy = loss_fn(output, target)
+                if config.mil_pooling == 'loss_attention':
+                    instance_labels = target * torch.ones(input.size(0), dtype=torch.long, device=input.device)
+                    loss_2 = WeightCrossEntropyLoss()(model.out_c, instance_labels, model.A)
+                    cross_entropy += 2.0 * loss_2
 
-            if config.class_specific:
-                max_dist = (model.prototype_shape[1]
-                            * model.prototype_shape[2]
-                            * model.prototype_shape[3])
+                if config.class_specific:
+                    max_dist = (model.prototype_shape[1]
+                                * model.prototype_shape[2]
+                                * model.prototype_shape[3])
 
-                # prototypes_of_correct_class is a tensor of shape batch_size * num_prototypes
+                    # prototypes_of_correct_class is a tensor of shape batch_size * num_prototypes
 
-                attention_detached = attention.detach().cpu()
-                weight = np.interp(attention_detached, (attention_detached.min(), attention_detached.max()), (0.001, 1))
+                    attention_detached = attention.detach().cpu()
+                    weight = np.interp(attention_detached, (attention_detached.min(), attention_detached.max()), (0.001, 1))
 
-                if weighting_attention:
-                    tensor_weight = torch.tensor(weight).cuda()
+                    if weighting_attention:
+                        tensor_weight = torch.tensor(weight).cuda()
+                    else:
+                        tensor_weight = torch.tensor(1).cuda()
+
+                    # calculate cluster cost
+                    prototypes_of_correct_class = torch.t(model.prototype_class_identity[:, label]).cuda()
+                    inverted_distances, _ = torch.max(
+                        (max_dist - (min_distances * tensor_weight.T)) * prototypes_of_correct_class, dim=1)
+                    cluster_cost = torch.mean(max_dist - inverted_distances)
+
+                    # calculate separation cost
+                    prototypes_of_wrong_class = 1 - prototypes_of_correct_class
+                    inverted_distances_to_nontarget_prototypes, _ = \
+                        torch.max((max_dist - (min_distances * tensor_weight.T)) * prototypes_of_wrong_class, dim=1)
+                    separation_cost = torch.mean(max_dist - inverted_distances_to_nontarget_prototypes)
+
+                    # calculate avg cluster cost
+                    avg_separation_cost = \
+                        torch.sum((min_distances * tensor_weight.T) * prototypes_of_wrong_class, dim=1) / torch.sum(
+                            prototypes_of_wrong_class,
+                            dim=1)
+                    avg_separation_cost = torch.mean(avg_separation_cost)
+
+                    if use_l1_mask:
+                        l1_mask = 1 - torch.t(model.prototype_class_identity).cuda()
+                        l1 = (model.last_layer.weight * l1_mask).norm(p=1)
+                    else:
+                        l1 = model.last_layer.weight.norm(p=1)
+
                 else:
-                    tensor_weight = torch.tensor(1).cuda()
-
-                # calculate cluster cost
-                prototypes_of_correct_class = torch.t(model.prototype_class_identity[:, label]).cuda()
-                inverted_distances, _ = torch.max(
-                    (max_dist - (min_distances * tensor_weight.T)) * prototypes_of_correct_class, dim=1)
-                cluster_cost = torch.mean(max_dist - inverted_distances)
-
-                # calculate separation cost
-                prototypes_of_wrong_class = 1 - prototypes_of_correct_class
-                inverted_distances_to_nontarget_prototypes, _ = \
-                    torch.max((max_dist - (min_distances * tensor_weight.T)) * prototypes_of_wrong_class, dim=1)
-                separation_cost = torch.mean(max_dist - inverted_distances_to_nontarget_prototypes)
-
-                # calculate avg cluster cost
-                avg_separation_cost = \
-                    torch.sum((min_distances * tensor_weight.T) * prototypes_of_wrong_class, dim=1) / torch.sum(
-                        prototypes_of_wrong_class,
-                        dim=1)
-                avg_separation_cost = torch.mean(avg_separation_cost)
-
-                if use_l1_mask:
-                    l1_mask = 1 - torch.t(model.prototype_class_identity).cuda()
-                    l1 = (model.last_layer.weight * l1_mask).norm(p=1)
-                else:
+                    min_distance, _ = torch.min(min_distances, dim=1)
+                    cluster_cost = torch.mean(min_distance)
                     l1 = model.last_layer.weight.norm(p=1)
 
+                # evaluation statistics
+                _, predicted = torch.max(output.data, 1)
+                n_examples += target.size(0)
+                n_correct += (predicted == target).sum().item()
+
+                pred_s = func.softmax(output, dim=-1)
+                preds.append(pred_s.data.cpu().numpy())
+                targets.append(target.cpu().numpy())
+
+                conf_matrix += confusion_matrix(target.cpu().numpy(), predicted.cpu().numpy(), labels=[0, 1])
+
+                n_batches += 1
+                total_cross_entropy += cross_entropy.item()
+                total_cluster_cost += cluster_cost.item()
+                total_separation_cost += separation_cost.item()
+                total_avg_separation_cost += avg_separation_cost.item()
+
+            # compute gradient and do SGD step
+            if config.class_specific:
+                loss = (config.coef_crs_ent * cross_entropy
+                        + config.coef_clst * cluster_cost
+                        + config.coef_sep * separation_cost
+                        + config.coef_l1 * l1)
             else:
-                min_distance, _ = torch.min(min_distances, dim=1)
-                cluster_cost = torch.mean(min_distance)
-                l1 = model.last_layer.weight.norm(p=1)
+                loss = (config.coef_crs_ent * cross_entropy
+                        + config.coef_clst * cluster_cost
+                        + config.coef_l1 * l1)
+            total_loss += loss.item()
+            if is_train:
+                optimizer.zero_grad()
+                loss.backward()
+                # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5) # gradient clipping
+                optimizer.step()
 
-            # evaluation statistics
-            _, predicted = torch.max(output.data, 1)
-            n_examples += target.size(0)
-            n_correct += (predicted == target).sum().item()
-
-            pred_s = func.softmax(output, dim=-1)
-            preds.append(pred_s.data.cpu().numpy())
-            targets.append(target.cpu().numpy())
-
-            conf_matrix += confusion_matrix(target.cpu().numpy(), predicted.cpu().numpy(), labels=[0, 1])
-
-            n_batches += 1
-            total_cross_entropy += cross_entropy.item()
-            total_cluster_cost += cluster_cost.item()
-            total_separation_cost += separation_cost.item()
-            total_avg_separation_cost += avg_separation_cost.item()
-
-        # compute gradient and do SGD step
-        if config.class_specific:
-            loss = (config.coef_crs_ent * cross_entropy
-                    + config.coef_clst * cluster_cost
-                    + config.coef_sep * separation_cost
-                    + config.coef_l1 * l1)
-        else:
-            loss = (config.coef_crs_ent * cross_entropy
-                    + config.coef_clst * cluster_cost
-                    + config.coef_l1 * l1)
-        total_loss += loss.item()
-        if is_train:
-            optimizer.zero_grad()
-            loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5) # gradient clipping
-            optimizer.step()
-
-        del input
-        del target
-        del output
-        del predicted
-        del min_distances
+            del input
+            del target
+            del output
+            del predicted
+            del min_distances
+            pbar.update(1)
 
     total_cross_entropy /= n_batches
     total_cluster_cost /= n_batches
@@ -219,7 +222,7 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     if log_writer:
         log_writer.add_scalar('p_avg_pair_dist' + suffix, p_avg_pair_dist, global_step=step)
 
-    return n_correct / n_examples
+    return auc
 
 
 def train(model, dataloader, optimizer, config: Settings, log_writer: SummaryWriter = None,

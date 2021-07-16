@@ -15,4 +15,4 @@ class FocalLoss(nn.Module):
         ce_loss = F.cross_entropy(input, target, reduction='none') # ce_loss is a vector of -log(pt)
         pt = torch.exp(-ce_loss) # e^(-log(pt)) = pt
         focal_loss = (self.alpha * (1-pt)**self.gamma * ce_loss).mean() # mean over the batch
-        return focal_loss
+        return focal_loss * 2
