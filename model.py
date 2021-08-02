@@ -318,8 +318,11 @@ class PPNet(nn.Module):
         # changing in_features and out_features make sure the numbers are consistent
         self.last_layer.in_features = self.num_prototypes
         self.last_layer.out_features = self.num_classes
-        self.last_layer.weight.data = self.last_layer.weight.data[:,
-                                      prototypes_to_keep]
+        self.last_layer.weight.data = self.last_layer.weight.data[:,prototypes_to_keep]
+        self.attention_V[0].in_features = self.num_prototypes
+        self.attention_V[0].weight.data = self.attention_V[0].weight.data[:,prototypes_to_keep]
+        self.attention_U[0].in_features = self.num_prototypes
+        self.attention_U[0].weight.data = self.attention_U[0].weight.data[:,prototypes_to_keep]
 
         # self.ones is nn.Parameter
         self.ones = nn.Parameter(self.ones.data[prototypes_to_keep, ...],
@@ -400,3 +403,14 @@ def construct_PPNet(base_architecture, pretrained=True, img_size=224,
                  prototype_activation_function=prototype_activation_function,
                  add_on_layers_type=add_on_layers_type,
                  mil_pooling=mil_pooling)
+
+
+def construct_PPNet_for_config(config):
+    return construct_PPNet(base_architecture=config.base_architecture,
+                           pretrained=False, img_size=config.img_size,
+                           prototype_shape=config.prototype_shape,
+                           num_classes=config.num_classes,
+                           prototype_activation_function=config.prototype_activation_function,
+                           add_on_layers_type=config.add_on_layers_type,
+                           batch_norm_features=config.batch_norm_features,
+                           mil_pooling=config.mil_pooling)

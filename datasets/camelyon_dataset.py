@@ -6,6 +6,7 @@ import torch
 import torch.utils.data as data_utils
 from sklearn.model_selection import StratifiedKFold
 from torchvision.datasets.folder import pil_loader
+from torchvision.transforms import transforms
 from torchvision.transforms.functional import to_tensor
 
 
@@ -37,13 +38,19 @@ class CamelyonPreprocessedBagsCross(data_utils.Dataset):
         else:
             self.dir_list = [d for d in self.dir_list if 'test' in d]
 
+    @classmethod
+    def load_raw_image(cls, path):
+        return to_tensor(pil_loader(path))
+
     class LazyLoader:
-        def __init__(self, path, dir):
+        def __init__(self, path, dir, indices):
             self.path = path
             self.dir = dir
+            self.indices = indices
 
         def __getitem__(self, item):
-            return to_tensor(pil_loader(os.path.join(self.path, self.dir, 'patch.{}.jpg'.format(item))))
+            return CamelyonPreprocessedBagsCross.load_raw_image(
+                os.path.join(self.path, self.dir, 'patch.{}.jpg'.format(int(self.indices[item]))))
 
     def __len__(self):
         return len(self.dir_list)
@@ -63,14 +70,15 @@ class CamelyonPreprocessedBagsCross(data_utils.Dataset):
                 rng = np.random.default_rng(3)
             indices = rng.permutation(bag.shape[0])[:self.max_bag]
             bag = bag[indices].detach().clone()
-            pass
+        else:
+            indices = np.arange(0, bag.shape[0])
         if self.all_labels:
             label = torch.LongTensor([self.labels[dir]] * bag.shape[0])
         else:
             label = torch.LongTensor([self.labels[dir]]).max().unsqueeze(0)
 
         if self.push:
-            return self.LazyLoader(self.path, dir), bag, label
+            return self.LazyLoader(self.path, dir, indices), bag, label
         else:
             return bag, label
 

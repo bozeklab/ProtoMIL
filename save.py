@@ -8,7 +8,6 @@ import numpy
 import torch
 
 from settings import Settings
-from train_and_test import TrainMode
 
 
 def save_model_w_condition(model, model_dir, model_name, accu, target_accu, log=print):
@@ -22,7 +21,7 @@ def save_model_w_condition(model, model_dir, model_name, accu, target_accu, log=
 
 
 def save_train_state(file_path_prefix: str, model: torch.nn.Module, things_with_state: Dict[str, Any],
-                     step: int, mode: TrainMode, epoch: int, iteration: Optional[int], experiment_run_name: str,
+                     step: int, mode, epoch: int, iteration: Optional[int], experiment_run_name: str,
                      best_accu: float, current_push_best_accu: Optional[float], current_accu: float, config: Settings):
     file_path = '{}.{}.{:.2f}.pck'.format(file_path_prefix, step, current_accu * 100)
     # save and atomic replace
@@ -59,7 +58,7 @@ def get_state_path_for_prefix(file_path_prefix: str):
 
 def load_train_state(file_path: str, model: torch.nn.Module, things_with_state: Dict[str, Any],
                      restore_random_state: bool = True) -> \
-        Tuple[int, TrainMode, int, Optional[int], str, float, Optional[float]]:
+        Tuple[int, Any, int, Optional[int], str, float, Optional[float]]:
     data = torch.load(file_path)
     model.load_state_dict(data['model'])
     for name, obj in things_with_state.items():

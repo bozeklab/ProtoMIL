@@ -1,11 +1,13 @@
 import heapq
 import os
 import time
+from functools import cached_property
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from tqdm import tqdm
 
 from helpers import makedir, find_high_activation_crop
 from receptive_field import compute_rf_prototype
@@ -25,13 +27,82 @@ class ImagePatch:
 
     def __init__(self, patch, label, distance,
                  original_img=None, act_pattern=None, patch_indices=None):
-        self.patch = patch
         self.label = label
         self.negative_distance = -distance
 
+        self.patch = patch
         self.original_img = original_img
         self.act_pattern = act_pattern
         self.patch_indices = patch_indices
+
+    def __lt__(self, other):
+        return self.negative_distance < other.negative_distance
+
+
+class ImagePatchLazy:
+
+    def __init__(self, label, distance, batch_idx, image_idx, dataset, protoL_rf_info, distance_map_j,
+                 prototype_activation_function_in_numpy, prototype_activation_function, max_dist, epsilon):
+        self.label = label
+        self.negative_distance = -distance
+        self.batch_idx = batch_idx
+        self.image_idx = image_idx
+        self.dataset = dataset
+        self.protoL_rf_info = protoL_rf_info
+        self.distance_map_j = distance_map_j
+        self.prototype_activation_function_in_numpy = prototype_activation_function_in_numpy
+        self.prototype_activation_function = prototype_activation_function
+        self.max_dist = max_dist
+        self.epsilon = epsilon
+
+    @cached_property
+    def original_raw(self):
+        return self.dataset[self.batch_idx][0][self.image_idx]
+
+    @cached_property
+    def closest_patch_indices_in_img(self):
+        closest_patch_indices_in_distance_map_j = \
+            list(np.unravel_index(np.argmin(self.distance_map_j, axis=None),
+                                  self.distance_map_j.shape))
+        closest_patch_indices_in_distance_map_j = [0] + closest_patch_indices_in_distance_map_j
+        closest_patch_indices_in_img = \
+            compute_rf_prototype(self.original_raw.size(1),
+                                 closest_patch_indices_in_distance_map_j,
+                                 self.protoL_rf_info)
+        return closest_patch_indices_in_img
+
+    @cached_property
+    def patch(self):
+        closest_patch_indices_in_img = self.closest_patch_indices_in_img
+        closest_patch = \
+            self.original_raw[:,
+            closest_patch_indices_in_img[1]:closest_patch_indices_in_img[2],
+            closest_patch_indices_in_img[3]:closest_patch_indices_in_img[4]]
+        closest_patch = closest_patch.numpy()
+        closest_patch = np.transpose(closest_patch, (1, 2, 0))
+        return closest_patch
+
+    @cached_property
+    def original_img(self):
+        original_img = self.original_raw.numpy()
+        original_img = np.transpose(original_img, (1, 2, 0))
+        return original_img
+
+    @cached_property
+    def act_pattern(self):
+        if self.prototype_activation_function == 'log':
+            act_pattern = np.log(
+                (self.distance_map_j + 1) / (self.distance_map_j + self.epsilon))
+        elif self.prototype_activation_function == 'linear':
+            act_pattern = self.max_dist - self.distance_map_j
+        else:
+            act_pattern = self.prototype_activation_function_in_numpy(self.distance_map_j)
+        return act_pattern
+
+    @cached_property
+    def patch_indices(self):
+        patch_indices = self.closest_patch_indices_in_img[1:5]
+        return patch_indices
 
     def __lt__(self, other):
         return self.negative_distance < other.negative_distance
@@ -76,69 +147,49 @@ def find_k_nearest_patches_to_prototypes(dataloader,  # pytorch dataloader (must
         # a heap in python is just a maintained list
         heaps.append([])
 
-    for idx, (search_batch_raw, search_batch, search_y) in enumerate(dataloader):
-        with torch.no_grad():
-            search_batch = search_batch.cuda()
-            protoL_input_torch, proto_dist_torch = \
-                ppnet.push_forward(search_batch)
+    with tqdm(total=len(dataloader.dataset), unit='bag') as pbar:
+        for idx, (search_batch_raw, search_batch, search_y) in enumerate(dataloader):
+            with torch.no_grad():
+                search_batch = search_batch.cuda()
+                protoL_input_torch, proto_dist_torch = \
+                    ppnet.push_forward(search_batch)
+            raw_sample = search_batch_raw[0]
 
-        # protoL_input_ = np.copy(protoL_input_torch.detach().cpu().numpy())
-        proto_dist_ = np.copy(proto_dist_torch.detach().cpu().numpy())
+            # protoL_input_ = np.copy(protoL_input_torch.detach().cpu().numpy())
+            proto_dist_ = np.copy(proto_dist_torch.detach().cpu().numpy())
 
-        for img_idx, distance_map in enumerate(proto_dist_):
-            for j in range(n_prototypes):
-                # find the closest patches in this batch to prototype j
+            for img_idx, distance_map in enumerate(proto_dist_):
+                for j in range(n_prototypes):
+                    # find the closest patches in this batch to prototype j
 
-                closest_patch_distance_to_prototype_j = np.amin(distance_map[j])
+                    closest_patch_distance_to_prototype_j = np.amin(distance_map[j])
 
-                if full_save:
-                    closest_patch_indices_in_distance_map_j = \
-                        list(np.unravel_index(np.argmin(distance_map[j], axis=None),
-                                              distance_map[j].shape))
-                    closest_patch_indices_in_distance_map_j = [0] + closest_patch_indices_in_distance_map_j
-                    closest_patch_indices_in_img = \
-                        compute_rf_prototype(search_batch.size(2),
-                                             closest_patch_indices_in_distance_map_j,
-                                             protoL_rf_info)
-                    closest_patch = \
-                        search_batch_raw[img_idx][:,
-                        closest_patch_indices_in_img[1]:closest_patch_indices_in_img[2],
-                        closest_patch_indices_in_img[3]:closest_patch_indices_in_img[4]]
-                    closest_patch = closest_patch.numpy()
-                    closest_patch = np.transpose(closest_patch, (1, 2, 0))
-
-                    original_img = search_batch_raw[img_idx].numpy()
-                    original_img = np.transpose(original_img, (1, 2, 0))
-
-                    if ppnet.prototype_activation_function == 'log':
-                        act_pattern = np.log(
-                            (distance_map[j] + 1) / (distance_map[j] + ppnet.epsilon))
-                    elif ppnet.prototype_activation_function == 'linear':
-                        act_pattern = max_dist - distance_map[j]
+                    if full_save:
+                        closest_patch = ImagePatchLazy(
+                            label=search_y[0],
+                            distance=closest_patch_distance_to_prototype_j,
+                            batch_idx=idx,
+                            image_idx=img_idx,
+                            dataset=dataloader.dataset,
+                            protoL_rf_info=protoL_rf_info,
+                            distance_map_j=distance_map[j],
+                            prototype_activation_function_in_numpy=prototype_activation_function_in_numpy,
+                            prototype_activation_function=ppnet.prototype_activation_function,
+                            max_dist=max_dist,
+                            epsilon=ppnet.epsilon
+                        )
                     else:
-                        act_pattern = prototype_activation_function_in_numpy(distance_map[j])
+                        closest_patch = ImagePatchInfo(label=search_y[0],
+                                                       distance=closest_patch_distance_to_prototype_j)
 
-                    # 4 numbers: height_start, height_end, width_start, width_end
-                    patch_indices = closest_patch_indices_in_img[1:5]
-
-                    # construct the closest patch object
-                    closest_patch = ImagePatch(patch=closest_patch,
-                                               label=search_y[0],
-                                               distance=closest_patch_distance_to_prototype_j,
-                                               original_img=original_img,
-                                               act_pattern=act_pattern,
-                                               patch_indices=patch_indices)
-                else:
-                    closest_patch = ImagePatchInfo(label=search_y[0],
-                                                   distance=closest_patch_distance_to_prototype_j)
-
-                # add to the j-th heap
-                if len(heaps[j]) < k:
-                    heapq.heappush(heaps[j], closest_patch)
-                else:
-                    # heappushpop runs more efficiently than heappush
-                    # followed by heappop
-                    heapq.heappushpop(heaps[j], closest_patch)
+                    # add to the j-th heap
+                    if len(heaps[j]) < k:
+                        heapq.heappush(heaps[j], closest_patch)
+                    else:
+                        # heappushpop runs more efficiently than heappush
+                        # followed by heappop
+                        heapq.heappushpop(heaps[j], closest_patch)
+            pbar.update(1)
 
     # after looping through the dataset every heap will
     # have the k closest prototypes

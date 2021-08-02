@@ -2,23 +2,38 @@ import argparse
 import os
 import shutil
 
-import torch.utils.data
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
+import torch
 
 import prune
-import save
-import train_and_test as tnt
-from helpers import makedir
-from log import create_logger
-from preprocess import mean, std, preprocess_input_function
+from datasets import get_datasets
+from helpers import makedir, load_or_create_experiment
+from model import construct_PPNet_for_config
+from preprocess import preprocess_input_function
+from save import load_train_state, save_train_state
+from train_and_test import test, last_only, train, valid
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-gpuid', nargs=1, type=str, default='0')
-parser.add_argument('-modeldir', nargs=1, type=str)
-parser.add_argument('-model', nargs=1, type=str)
-args = parser.parse_args()
-os.environ['CUDA_VISIBLE_DEVICES'] = args.gpuid[0]
+
+args, config, seed, DEBUG, load_state_path, checkpoint_file_prefix = load_or_create_experiment(force_load=True)
+
+workers = 0 if DEBUG else 4
+
+train_loader, train_push_loader, valid_loader, valid_push_loader, test_loader, test_push_loader = get_datasets(
+    args.dataset, seed, workers, config)
+
+print('Dataset loaded.')
+
+ppnet = construct_PPNet_for_config(config).cuda()
+
+(step,
+ mode,
+ epoch,
+ iteration,
+ experiment_run_name,
+ best_accu,
+ _) = load_train_state(load_state_path, ppnet, {})
+print('Resuming experiment: {}'.format(experiment_run_name))
+print('Best score so far: {}'.format(best_accu))
 
 optimize_last_layer = True
 
@@ -26,19 +41,12 @@ optimize_last_layer = True
 k = 6
 prune_threshold = 3
 
-original_model_dir = args.modeldir[0]  # './saved_models/densenet161/003/'
-original_model_name = args.model[0]  # '10_16push0.8007.pth'
+# original_model_dir = args.modeldir[0]  # './saved_models/densenet161/003/'
+# original_model_name = args.model[0]  # '10_16push0.8007.pth'
+original_model_dir = os.path.dirname(load_state_path)
+original_model_name = os.path.basename(load_state_path)
 
-need_push = ('nopush' in original_model_name)
-if need_push:
-    assert (False)  # pruning must happen after push
-else:
-    epoch = original_model_name.split('push')[0]
-
-if '_' in epoch:
-    epoch = int(epoch.split('_')[0])
-else:
-    epoch = int(epoch)
+assert not ('nopush' in original_model_name)
 
 model_dir = os.path.join(original_model_dir, 'pruned_prototypes_epoch{}_k{}_pt{}'.format(epoch,
                                                                                          k,
@@ -46,110 +54,63 @@ model_dir = os.path.join(original_model_dir, 'pruned_prototypes_epoch{}_k{}_pt{}
 makedir(model_dir)
 shutil.copy(src=os.path.join(os.getcwd(), __file__), dst=model_dir)
 
-log, logclose = create_logger(log_filename=os.path.join(model_dir, 'prune.log'))
-
-ppnet = torch.load(original_model_dir + original_model_name)
-ppnet = ppnet.cuda()
-ppnet_multi = torch.nn.DataParallel(ppnet)
 class_specific = True
 
-# load the data
-from settings import train_dir, test_dir, train_push_dir
-
-train_batch_size = 80
-test_batch_size = 100
-img_size = 224
-train_push_batch_size = 80
-
-normalize = transforms.Normalize(mean=mean,
-                                 std=std)
-
-# train set
-train_dataset = datasets.ImageFolder(
-    train_dir,
-    transforms.Compose([
-        transforms.Resize(size=(img_size, img_size)),
-        transforms.ToTensor(),
-        normalize,
-    ]))
-train_loader = torch.utils.data.DataLoader(
-    train_dataset, batch_size=train_batch_size, shuffle=True,
-    num_workers=4, pin_memory=False)
-
-# test set
-test_dataset = datasets.ImageFolder(
-    test_dir,
-    transforms.Compose([
-        transforms.Resize(size=(img_size, img_size)),
-        transforms.ToTensor(),
-        normalize,
-    ]))
-test_loader = torch.utils.data.DataLoader(
-    test_dataset, batch_size=test_batch_size, shuffle=False,
-    num_workers=4, pin_memory=False)
-
-log('training set size: {0}'.format(len(train_loader.dataset)))
-log('test set size: {0}'.format(len(test_loader.dataset)))
-log('batch size: {0}'.format(train_batch_size))
-
-# push set: needed for pruning because it is unnormalized
-train_push_dataset = datasets.ImageFolder(
-    train_push_dir,
-    transforms.Compose([
-        transforms.Resize(size=(img_size, img_size)),
-        transforms.ToTensor(),
-    ]))
-train_push_loader = torch.utils.data.DataLoader(
-    train_push_dataset, batch_size=train_push_batch_size, shuffle=False,
-    num_workers=4, pin_memory=False)
-
-log('push set size: {0}'.format(len(train_push_loader.dataset)))
-
-tnt.test(model=ppnet_multi, dataloader=test_loader,
-         class_specific=class_specific, log=log)
+test(model=ppnet, dataloader=test_loader, config=config, step=0, weighting_attention=args.weighting_attention)
+# tnt.test(model=ppnet, dataloader=test_loader, class_specific=class_specific)
 
 # prune prototypes
-log('prune')
+print('prune')
+step += 1
 prune.prune_prototypes(dataloader=train_push_loader,
-                       prototype_network_parallel=ppnet_multi,
+                       ppnet=ppnet,
                        k=k,
                        prune_threshold=prune_threshold,
                        preprocess_input_function=preprocess_input_function,  # normalize
                        original_model_dir=original_model_dir,
                        epoch_number=epoch,
                        # model_name=None,
-                       log=log,
+                       log=print,
                        copy_prototype_imgs=True)
-accu = tnt.test(model=ppnet_multi, dataloader=test_loader,
-                class_specific=class_specific, log=log)
-save.save_model_w_condition(model=ppnet, model_dir=model_dir,
-                            model_name=original_model_name.split('push')[0] + 'prune',
-                            accu=accu,
-                            target_accu=0.70, log=log)
+accu = test(model=ppnet, dataloader=test_loader, config=config, weighting_attention=args.weighting_attention)
+save_train_state(os.path.join(model_dir, original_model_name.split('push')[0] + 'prune'), ppnet, {}, step, mode, epoch,
+                 iteration, experiment_run_name, best_accu, accu, accu, config)
+current_push_best_accu = accu
 
 # last layer optimization
 if optimize_last_layer:
-    last_layer_optimizer_specs = [{'params': ppnet.last_layer.parameters(), 'lr': 1e-4}]
+    last_layer_optimizer_specs = [
+        {
+            'params': ppnet.last_layer.parameters(),
+            'lr': config.last_layer_optimizer_lr['last_layer']
+        },
+        {
+            'params': ppnet.attention_V.parameters(),
+            'lr': config.last_layer_optimizer_lr['attention']
+        },
+        {
+            'params': ppnet.attention_U.parameters(),
+            'lr': config.last_layer_optimizer_lr['attention']
+        },
+        {
+            'params': ppnet.attention_weights.parameters(),
+            'lr': config.last_layer_optimizer_lr['attention']
+        }
+    ]
     last_layer_optimizer = torch.optim.Adam(last_layer_optimizer_specs)
 
-    coefs = {
-        'crs_ent': 1,
-        'clst': 0.8,
-        'sep': -0.08,
-        'l1': 1e-4,
-    }
+    print('optimize last layer')
 
-    log('optimize last layer')
-    tnt.last_only(model=ppnet_multi, log=log)
     for i in range(100):
-        log('iteration: \t{0}'.format(i))
-        _ = tnt.train(model=ppnet_multi, dataloader=train_loader, optimizer=last_layer_optimizer,
-                      class_specific=class_specific, coefs=coefs, log=log)
-        accu = tnt.test(model=ppnet_multi, dataloader=test_loader,
-                        class_specific=class_specific, log=log)
-        save.save_model_w_condition(model=ppnet, model_dir=model_dir,
-                                    model_name=original_model_name.split('push')[0] + '_' + str(i) + 'prune',
-                                    accu=accu,
-                                    target_accu=0.70, log=log)
-
-logclose()
+        step += 1
+        print('iteration: \t{0}'.format(i))
+        last_only(model=ppnet)
+        train(model=ppnet, dataloader=train_loader, optimizer=last_layer_optimizer, config=config,
+              step=step, weighting_attention=args.weighting_attention)
+        accu = valid(model=ppnet, dataloader=valid_loader, config=config, step=step,
+                     weighting_attention=args.weighting_attention)
+        if current_push_best_accu < accu:
+            save_train_state(os.path.join(model_dir, original_model_name.split('push')[0] + 'prune'), ppnet, {}, step,
+                             mode, epoch,
+                             iteration, experiment_run_name, best_accu, accu, accu, config)
+            current_push_best_accu = accu

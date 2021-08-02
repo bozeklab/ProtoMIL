@@ -1,171 +1,32 @@
-import argparse
 import datetime
-import getpass
 import glob
 import os
 import platform
-import random
-import sys
 
-import matplotlib
-import numpy
 import torch.utils.data
 from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
 
-from analysis import generate_prototype_activation_matrix
-from datasets.breast_dataset import BreastCancerBagsCross
-from datasets.camelyon_dataset import CamelyonPreprocessedBagsCross
-from datasets.colon_dataset import ColonCancerBagsCross
-from datasets.mnist_dataset import MnistBags
-from helpers import makedir, str2bool
-from model import construct_PPNet
+from analysis import generate_prototype_activation_matrix, generate_prototype_activation_matrices
+from datasets import get_datasets
+from helpers import makedir, load_or_create_experiment, SAVED_MODELS_PATH, LOGS_DIR, \
+    CHECKPOINT_FREQUENCY_STEPS
+from model import construct_PPNet, construct_PPNet_for_config
 from push import push_prototypes
-from save import load_train_state, save_train_state, get_state_path_for_prefix, load_config_from_train_state, \
-    load_model_from_train_state, snapshot_code
-from settings import COLON_CANCER_SETTINGS, MNIST_SETTINGS, Settings, BREAST_CANCER_SETTINGS, CAMELYON_SETTINGS
-from train_and_test import warm_only, train, joint, test, last_only, TrainMode, valid
+from save import load_train_state, save_train_state, get_state_path_for_prefix, load_model_from_train_state, \
+    snapshot_code
+from train_and_test import warm_only, train, joint, test, last_only, valid, TrainMode
 
-matplotlib.use('Agg')
+args, config, seed, DEBUG, load_state_path, checkpoint_file_prefix = load_or_create_experiment()
 
-# detect debugger
-gettrace = getattr(sys, 'gettrace', None)
-DEBUG = gettrace is not None and gettrace()
-if DEBUG:
-    print('DEBUG MODE - parallelism disabled')
+workers = 0 if DEBUG else 4
 
-CHECKPOINT_PREFIX = 'checkpoint'
-LOGS_DIR = 'runs'
-SAVED_MODELS_PATH = 'saved_models'
-CHECKPOINT_FREQUENCY_STEPS = 1
-
-# noinspection PyTypeChecker
-parser = argparse.ArgumentParser(prog='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('-g', '--gpuid', type=int, default=0, help='CUDA device id to use')
-parser.add_argument('-d', '--dataset', type=str, required=True, choices=['mnist', 'colon_cancer', 'breast_cancer',
-                                                                         'camelyon'], help='Select dataset')
-parser.add_argument('-n', '--new_experiment', default=False, action='store_true',
-                    help='Overwrite any saved state and start a new experiment (saved checkpoint will be lost)')
-parser.add_argument('-l', '--load_state', metavar='STATE_FILE', type=str, default=None,
-                    help='Continue training from specified state file (saved checkpoint will be lost)')
-parser.add_argument('-c', '--run_name_prefix', type=str, default=None, help='Prefix for the experiment name')
-parser.add_argument('-a', '--alloc', type=int, default=None)
-parser.add_argument('-w', '--weighting_attention', default=False, action='store_true')
-parser.add_argument('--deterministic', type=str2bool, default=True, help='Use deterministic mode (slightly slower)')
-for param_name, param_type in Settings.as_params():
-    parser.add_argument('--{}'.format(param_name), type=param_type)
-args = parser.parse_args()
-
-if args.new_experiment and args.load_state:
-    print('You cannot load state and start a new experiment at the same time')
-    exit(-1)
-
-checkpoint_file_prefix = '{}.{}.{}'.format(CHECKPOINT_PREFIX, args.dataset, getpass.getuser())
-checkpoint_files = get_state_path_for_prefix(checkpoint_file_prefix)
-load_state_path = None
-if args.load_state:
-    load_state_path = args.load_state
-elif not args.new_experiment and len(checkpoint_files) > 0:
-    if len(checkpoint_files) > 1:
-        print('Multiple checkpoint files detected: {}'.format(checkpoint_files))
-        print('Leave only one and remove all others to continue or specify which one to use with --load_state')
-        exit(1)
-    load_state_path = checkpoint_files[0]
-
-config = None
-if load_state_path:
-    print('Loading state from: {}'.format(load_state_path))
-    if args.deterministic:
-        print('WARNING: resuming from saved state is not fully deterministic!')
-    config = load_config_from_train_state(load_state_path)
-if config is None:
-    print('Using default base settings for', args.dataset)
-    config = {
-        'colon_cancer': COLON_CANCER_SETTINGS,
-        'breast_cancer': BREAST_CANCER_SETTINGS,
-        'mnist': MNIST_SETTINGS,
-        'camelyon': CAMELYON_SETTINGS,
-    }[args.dataset]
-
-os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpuid)
-print('CUDA available:', torch.cuda.is_available())
-
-if args.alloc:
-    mem_holder = torch.randint(0, 1, size=(args.alloc * 1024 * 1024 // 8,), dtype=torch.int64,
-                               device=torch.device('cuda'))
-
-config = config.new_from_params(args)
-print(config)
-
-if config.random_seed_value is not None:
-    seed = config.random_seed_value
-elif config.random_seed_id is not None and config.random_seed_id >= 0:
-    seed = config.random_seed_presets[config.random_seed_id]
-else:
-    seed = torch.seed()
-torch.manual_seed(seed)
-numpy.random.seed(seed)
-random.seed(seed)
-print('Seed: {}'.format(seed))
-
-if args.deterministic:
-    # Make deterministic.
-    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
-    torch.set_deterministic(True)
-    print('Deterministic mode enabled.')
-else:
-    print('WARNING: proceeding with non-deterministic mode.')
-
-if args.dataset == 'colon_cancer':
-    ds = ColonCancerBagsCross(path="data/ColonCancer", train=True, shuffle_bag=True, data_augmentation=True,
-                              fold_id=config.fold_id, folds=config.folds, random_state=seed)
-    ds_push = ColonCancerBagsCross(path="data/ColonCancer", train=True, push=True, shuffle_bag=True,
-                                   fold_id=config.fold_id, folds=config.folds, random_state=seed)
-    ds_valid = ColonCancerBagsCross(path="data/ColonCancer", train=False, all_labels=True, fold_id=config.fold_id,
-                                    folds=config.folds, random_state=seed)
-    ds_test = ColonCancerBagsCross(path="data/ColonCancer", train=False, test=True, all_labels=True,
-                                   fold_id=config.fold_id, folds=config.folds, random_state=seed)
-elif args.dataset == 'breast_cancer':
-    ds = BreastCancerBagsCross(path="data/Bisque", train=True, shuffle_bag=True, data_augmentation=True,
-                               fold_id=config.fold_id, folds=config.folds, random_state=seed)
-    ds_push = BreastCancerBagsCross(path="data/Bisque", train=True, push=True, shuffle_bag=True,
-                                    fold_id=config.fold_id, folds=config.folds, random_state=seed)
-    ds_valid = BreastCancerBagsCross(path="data/Bisque", train=False, all_labels=True, fold_id=config.fold_id,
-                                     folds=config.folds, random_state=seed)
-    ds_test = BreastCancerBagsCross(path="data/Bisque", train=False, test=True, all_labels=True,
-                                    fold_id=config.fold_id, folds=config.folds, random_state=seed)
-elif args.dataset == 'mnist':
-    ds = MnistBags(train=True, random_state=seed, **config.dataset_settings)
-    ds_push = MnistBags(train=True, push=True, random_state=seed, **config.dataset_settings)
-    ds_valid = MnistBags(train=False, random_state=seed, **config.dataset_settings, all_labels=True)
-    ds_test = MnistBags(train=False, test=True, random_state=seed, **config.dataset_settings, all_labels=True)
-elif args.dataset == 'camelyon':
-    ds = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=True, shuffle_bag=True,
-                                       data_augmentation=True,
-                                       fold_id=config.fold_id, folds=config.folds, random_state=seed)
-    ds_push = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=True, push=True, shuffle_bag=True,
-                                            fold_id=config.fold_id, folds=config.folds, random_state=seed)
-    ds_valid = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=False, all_labels=True,
-                                             fold_id=config.fold_id,
-                                             folds=config.folds, random_state=seed)
-    ds_test = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=False, test=True, all_labels=True,
-                                            fold_id=config.fold_id, folds=config.folds, random_state=seed)
-else:
-    raise NotImplementedError()
+train_loader, train_push_loader, valid_loader, valid_push_loader, test_loader, test_push_loader = get_datasets(
+    args, seed, workers, config)
 
 print('Dataset loaded.')
-print('training set size: {}, push set size: {}, valid set size: {}, test set size: {}'.format(
-    len(ds), len(ds_push), len(ds_valid), len(ds_test)))
 
-ppnet = construct_PPNet(base_architecture=config.base_architecture,
-                        pretrained=False, img_size=config.img_size,
-                        prototype_shape=config.prototype_shape,
-                        num_classes=config.num_classes,
-                        prototype_activation_function=config.prototype_activation_function,
-                        add_on_layers_type=config.add_on_layers_type,
-                        batch_norm_features=config.batch_norm_features,
-                        mil_pooling=config.mil_pooling)
-ppnet = ppnet.cuda()
+ppnet = construct_PPNet_for_config(config).cuda()
 
 if config.base_architecture != 'noop':
     summary(ppnet, (10, 3, config.img_size, config.img_size), col_names=("input_size", "output_size", "num_params"),
@@ -296,25 +157,6 @@ prototype_img_filename_prefix = 'prototype-img'
 prototype_self_act_filename_prefix = 'prototype-self-act'
 proto_bound_boxes_filename_prefix = 'bb'
 
-workers = 0 if DEBUG else 6
-
-train_loader = torch.utils.data.DataLoader(
-    ds, batch_size=None, shuffle=True,
-    num_workers=workers,
-    pin_memory=False)
-train_push_loader = torch.utils.data.DataLoader(
-    ds_push, batch_size=None, shuffle=False,
-    num_workers=workers,
-    pin_memory=False)
-valid_loader = torch.utils.data.DataLoader(
-    ds_valid, batch_size=None, shuffle=False,
-    num_workers=workers,
-    pin_memory=False)
-test_loader = torch.utils.data.DataLoader(
-    ds_test, batch_size=None, shuffle=False,
-    num_workers=workers,
-    pin_memory=False)
-
 # noinspection PyTypeChecker
 log_writer.add_text('dataset_stats',
                     'training set size: {}, push set size: {}, valid set size: {}, test set size: {}'.format(
@@ -417,15 +259,16 @@ while True:
         iteration += 1
         push_model_state_epoch = epoch
         if iteration >= config.num_last_layer_iterations:
-            if args.dataset != 'camelyon':
-                log_writer.add_figure('prototype_analysis/positive',
-                                      generate_prototype_activation_matrix(ppnet, valid_loader, train_push_loader, epoch,
-                                                                           model_dir, torch.device('cuda'), bag_class=1)
-                                      , global_step=step)
-                log_writer.add_figure('prototype_analysis/negative',
-                                      generate_prototype_activation_matrix(ppnet, valid_loader, train_push_loader, epoch,
-                                                                           model_dir, torch.device('cuda'), bag_class=0)
-                                      , global_step=step)
+            log_writer.add_figure('prototype_analysis/positive',
+                                  generate_prototype_activation_matrix(ppnet, valid_push_loader, train_push_loader,
+                                                                       epoch,
+                                                                       model_dir, torch.device('cuda'), bag_class=1)
+                                  , global_step=step)
+            log_writer.add_figure('prototype_analysis/negative',
+                                  generate_prototype_activation_matrix(ppnet, valid_push_loader, train_push_loader,
+                                                                       epoch,
+                                                                       model_dir, torch.device('cuda'), bag_class=0)
+                                  , global_step=step)
             iteration = None
             epoch += 1
             mode = TrainMode.JOINT
@@ -493,16 +336,11 @@ accu = test(model=ppnet_test, dataloader=test_loader, config=config, log_writer=
 
 epoch_for_ppnet_test = path_to_model_with_max_push_acc.split(".")[-7].split("/")[-1]
 
-log_writer.add_figure('test_prototype_analysis/positive',
-                      generate_prototype_activation_matrix(ppnet_test, test_loader, train_push_loader,
-                                                           epoch_for_ppnet_test,
-                                                           model_dir, torch.device('cuda'), bag_class=1)
-                      , global_step=step)
-log_writer.add_figure('test_prototype_analysis/negative',
-                      generate_prototype_activation_matrix(ppnet_test, test_loader, train_push_loader,
-                                                           epoch_for_ppnet_test,
-                                                           model_dir, torch.device('cuda'), bag_class=0)
-                      , global_step=step)
+pos_matrix, neg_matrix = generate_prototype_activation_matrices(ppnet_test, test_push_loader, train_push_loader,
+                                                                epoch_for_ppnet_test,
+                                                                model_dir, torch.device('cuda'))
+log_writer.add_figure('test_prototype_analysis/positive', pos_matrix, global_step=step)
+log_writer.add_figure('test_prototype_analysis/negative', neg_matrix, global_step=step)
 
 best_model_path = os.path.join(model_dir, 'end')
 save_train_state(best_model_path, ppnet, other_state, step, mode, epoch, iteration, experiment_run_name,
@@ -510,6 +348,3 @@ save_train_state(best_model_path, ppnet, other_state, step, mode, epoch, iterati
 [os.remove(checkpoint) for checkpoint in get_state_path_for_prefix(checkpoint_file_prefix)]
 log_writer.flush()
 log_writer.close()
-
-if args.alloc:
-    print(mem_holder[0].item())

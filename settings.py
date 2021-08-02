@@ -53,7 +53,7 @@ class Settings:
         default_factory=lambda: [631056511, 923928841, 53306087, 937272127, 207121037])
     random_seed_id: int = 0
     # overrides random seed preset and id.
-    random_seed_value = None
+    random_seed_value: int = None
 
     noop_features_size: Optional[Tuple[int, int, int]] = None
 
@@ -213,13 +213,13 @@ CAMELYON_SETTINGS = Settings(
     base_architecture='noop',
     img_size=224,
     noop_features_size=(512, 7, 7),
-    prototype_number=20,
+    prototype_number=10,
     prototype_latent=128,
     prototype_conv_dim=(2, 2),
     joint_optimizer_lrs={
-        'features': 1e-5,
-        'add_on_layers': 1e-5,
-        'prototype_vectors': 1e-5,
+        'features': 3e-5,
+        'add_on_layers': 3e-5,
+        'prototype_vectors': 3e-5,
     },
     joint_lr_step_size=10,
     joint_lr_gamma=0.1,
@@ -235,9 +235,18 @@ CAMELYON_SETTINGS = Settings(
         'attention': 1e-3,
         'last_layer': 1e-4,
     },
-    num_train_epochs=101,
-    num_warm_epochs=40,
-    num_last_layer_iterations=20,
-    push_start=40,
+    num_train_epochs=61,
+    num_warm_epochs=50,
+    num_last_layer_iterations=40,
+    push_start=50,
     push_epochs=[i for i in range(200) if i % 10 == 0]
 )
+
+
+def get_settings(name: str):
+    return {
+        'colon_cancer': COLON_CANCER_SETTINGS,
+        'breast_cancer': BREAST_CANCER_SETTINGS,
+        'mnist': MNIST_SETTINGS,
+        'camelyon': CAMELYON_SETTINGS,
+    }[name]
