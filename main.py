@@ -22,7 +22,7 @@ args, config, seed, DEBUG, load_state_path, checkpoint_file_prefix = load_or_cre
 workers = 0 if DEBUG else 4
 
 train_loader, train_push_loader, valid_loader, valid_push_loader, test_loader, test_push_loader = get_datasets(
-    args, seed, workers, config)
+    args.dataset, seed, workers, config)
 
 print('Dataset loaded.')
 
@@ -318,7 +318,7 @@ for i in config.push_epochs:
             path_to_model_with_max_push_acc = model_push_path
 
 ppnet_test = construct_PPNet(base_architecture=config.base_architecture,
-                             pretrained=False,
+                             pretrained=config.pretrained,
                              img_size=config.img_size,
                              prototype_shape=config.prototype_shape,
                              num_classes=config.num_classes,

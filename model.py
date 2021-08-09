@@ -407,7 +407,7 @@ def construct_PPNet(base_architecture, pretrained=True, img_size=224,
 
 def construct_PPNet_for_config(config):
     return construct_PPNet(base_architecture=config.base_architecture,
-                           pretrained=False, img_size=config.img_size,
+                           pretrained=config.pretrained, img_size=config.img_size,
                            prototype_shape=config.prototype_shape,
                            num_classes=config.num_classes,
                            prototype_activation_function=config.prototype_activation_function,

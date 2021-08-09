@@ -47,8 +47,7 @@ def generate_prototype_activation_matrix(ppnet, test_push_dataloader, push_datal
     # print('Prototypes are chosen from ' + str(len(set(prototype_img_identity))) + ' number of classes.')
     # print('Their class identities are: ' + str(prototype_img_identity))
 
-    raw, bag, label = next(
-        ((b, r, l) for b, r, l in iter(test_push_dataloader) if l.max().unsqueeze(0) == bag_class and len(l) >= N))
+    raw, bag, label = next(((b, r, l) for b, r, l in iter(test_push_dataloader) if l.max().unsqueeze(0) == bag_class and len(b) >= N))
 
     count_positive_patches = sum(label)
     if len(label) > 1:
