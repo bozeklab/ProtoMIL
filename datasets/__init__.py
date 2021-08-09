@@ -39,7 +39,7 @@ def get_train(name, seed=3, workers=0, config=None):
     else:
         raise NotImplementedError()
 
-    print('training set size: {}'.format(len(ds)), file=sys.stderr)
+    print('training set size: {}'.format(len(ds)))
 
     train_loader = DataLoader(
         ds, batch_size=None, shuffle=True,
@@ -86,7 +86,7 @@ def get_valid(name, seed=3, workers=0, config=None):
     else:
         raise NotImplementedError()
 
-    print('valid set size: {}'.format(len(ds_valid)), file=sys.stderr)
+    print('valid set size: {}'.format(len(ds_valid)))
 
     valid_loader = DataLoader(
         ds_valid, batch_size=None, shuffle=False,
@@ -129,7 +129,7 @@ def get_test(name, seed=3, workers=0, config=None):
     else:
         raise NotImplementedError()
 
-    print('test set size: {}'.format(len(ds_test)), file=sys.stderr)
+    print('test set size: {}'.format(len(ds_test)))
 
     test_loader = DataLoader(
         ds_test, batch_size=None, shuffle=False,

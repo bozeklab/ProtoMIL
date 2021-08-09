@@ -8,6 +8,17 @@ from helpers import makedir
 import find_nearest
 
 
+def find_prototypes_to_prune(ppnet, nearest_train_patch_class_ids, prune_threshold):
+    prototypes_to_prune = []
+    for j in range(ppnet.num_prototypes):
+        class_j = torch.argmax(ppnet.prototype_class_identity[j]).item()
+        nearest_train_patch_class_counts_j = Counter(nearest_train_patch_class_ids[j])
+        # if no such element is in Counter, it will return 0
+        if nearest_train_patch_class_counts_j[class_j] < prune_threshold:
+            prototypes_to_prune.append(j)
+    return prototypes_to_prune
+
+
 def prune_prototypes(dataloader,
                      ppnet,
                      k,
@@ -16,7 +27,9 @@ def prune_prototypes(dataloader,
                      original_model_dir,
                      epoch_number,
                      log=print,
-                     copy_prototype_imgs=True):
+                     copy_prototype_imgs=True,
+                     find_threshold_prune_n_patches=None,
+                     only_n_most_activated=None):
     ### run global analysis
     nearest_train_patch_class_ids = \
         find_nearest.find_k_nearest_patches_to_prototypes(dataloader=dataloader,
@@ -24,18 +37,28 @@ def prune_prototypes(dataloader,
                                                           k=k,
                                                           preprocess_input_function=preprocess_input_function,
                                                           full_save=False,
-                                                          log=log)
+                                                          log=log, only_n_most_activated=only_n_most_activated)
 
     ### find prototypes to prune
     original_num_prototypes = ppnet.num_prototypes
 
-    prototypes_to_prune = []
-    for j in range(ppnet.num_prototypes):
-        class_j = torch.argmax(ppnet.prototype_class_identity[j]).item()
-        nearest_train_patch_class_counts_j = Counter(nearest_train_patch_class_ids[j])
-        # if no such element is in Counter, it will return 0
-        if nearest_train_patch_class_counts_j[class_j] < prune_threshold:
-            prototypes_to_prune.append(j)
+    if find_threshold_prune_n_patches is None:
+        prototypes_to_prune = find_prototypes_to_prune(ppnet, nearest_train_patch_class_ids, prune_threshold)
+    else:
+        low = 0.0001
+        high = 10
+        prototypes_to_prune = []
+        for _ in range(30):
+            m = (low + high) / 2
+            current_prototypes_to_prune = find_prototypes_to_prune(ppnet, nearest_train_patch_class_ids, m)
+            print(m, current_prototypes_to_prune)
+            if len(current_prototypes_to_prune) > find_threshold_prune_n_patches:
+                high = m
+            else:
+                low = m
+            if len(current_prototypes_to_prune) <= find_threshold_prune_n_patches:
+                prototypes_to_prune = current_prototypes_to_prune
+                prune_threshold = m
 
     log('k = {}, prune_threshold = {}'.format(k, prune_threshold))
     log('{} prototypes will be pruned'.format(len(prototypes_to_prune)))
@@ -57,6 +80,7 @@ def prune_prototypes(dataloader,
             prune_info)
 
     ### prune prototypes
+    print('Prototypes to prune', prototypes_to_prune)
     ppnet.prune_prototypes(prototypes_to_prune)
     # torch.save(obj=ppnet,
     #           f=os.path.join(original_model_dir, 'pruned_prototypes_epoch{}_k{}_pt{}'.format(epoch_number,

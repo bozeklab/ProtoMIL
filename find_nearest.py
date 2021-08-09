@@ -126,7 +126,8 @@ def find_k_nearest_patches_to_prototypes(dataloader,  # pytorch dataloader (must
                                          full_save=False,  # save all the images
                                          root_dir_for_saving_images='./nearest',
                                          log=print,
-                                         prototype_activation_function_in_numpy=None):
+                                         prototype_activation_function_in_numpy=None,
+                                         only_n_most_activated=None):
     ppnet.eval()
     '''
     full_save=False will only return the class identity of the closest
@@ -151,14 +152,23 @@ def find_k_nearest_patches_to_prototypes(dataloader,  # pytorch dataloader (must
         for idx, (search_batch_raw, search_batch, search_y) in enumerate(dataloader):
             with torch.no_grad():
                 search_batch = search_batch.cuda()
-                protoL_input_torch, proto_dist_torch = \
-                    ppnet.push_forward(search_batch)
+                ppnet.forward(search_batch)
+                proto_dist_torch = ppnet.distances
+                attention = ppnet.A
             raw_sample = search_batch_raw[0]
 
             # protoL_input_ = np.copy(protoL_input_torch.detach().cpu().numpy())
             proto_dist_ = np.copy(proto_dist_torch.detach().cpu().numpy())
 
+            if only_n_most_activated:
+                most_activates = list(
+                    torch.topk(attention, min(only_n_most_activated, attention.shape[1]), dim=-1, largest=True)[1].detach().cpu().numpy()[0])
+
             for img_idx, distance_map in enumerate(proto_dist_):
+                if only_n_most_activated:
+                    if img_idx not in most_activates:
+                        continue
+
                 for j in range(n_prototypes):
                     # find the closest patches in this batch to prototype j
 

@@ -250,6 +250,7 @@ class PPNet(nn.Module):
     def forward_(self, x):
         # x = x.squeeze(0)
         distances = self.prototype_distances(x)
+        self.distances = distances
         '''
         we cannot refactor the lines below for similarity scores
         because we need to return min_distances

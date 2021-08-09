@@ -1,6 +1,5 @@
 import argparse
 import os
-import shutil
 
 import torch
 
@@ -39,10 +38,11 @@ optimize_last_layer = True
 
 # pruning parameters
 k = 6
-prune_threshold = 3
+prune_threshold = 6
+find_threshold_prune_n_patches = 4
+only_n_most_activated =  200
+# epoch = 50
 
-# original_model_dir = args.modeldir[0]  # './saved_models/densenet161/003/'
-# original_model_name = args.model[0]  # '10_16push0.8007.pth'
 original_model_dir = os.path.dirname(load_state_path)
 original_model_name = os.path.basename(load_state_path)
 
@@ -52,12 +52,8 @@ model_dir = os.path.join(original_model_dir, 'pruned_prototypes_epoch{}_k{}_pt{}
                                                                                          k,
                                                                                          prune_threshold))
 makedir(model_dir)
-shutil.copy(src=os.path.join(os.getcwd(), __file__), dst=model_dir)
 
-class_specific = True
-
-test(model=ppnet, dataloader=test_loader, config=config, step=0, weighting_attention=args.weighting_attention)
-# tnt.test(model=ppnet, dataloader=test_loader, class_specific=class_specific)
+# test(model=ppnet, dataloader=test_loader, config=config, step=0, weighting_attention=args.weighting_attention)
 
 # prune prototypes
 print('prune')
@@ -71,8 +67,11 @@ prune.prune_prototypes(dataloader=train_push_loader,
                        epoch_number=epoch,
                        # model_name=None,
                        log=print,
-                       copy_prototype_imgs=True)
+                       copy_prototype_imgs=True,
+                       find_threshold_prune_n_patches=find_threshold_prune_n_patches,
+                       only_n_most_activated=only_n_most_activated)
 accu = test(model=ppnet, dataloader=test_loader, config=config, weighting_attention=args.weighting_attention)
+print('New best score: {}, saving snapshot'.format(accu))
 save_train_state(os.path.join(model_dir, original_model_name.split('push')[0] + 'prune'), ppnet, {}, step, mode, epoch,
                  iteration, experiment_run_name, best_accu, accu, accu, config)
 current_push_best_accu = accu
@@ -101,7 +100,7 @@ if optimize_last_layer:
 
     print('optimize last layer')
 
-    for i in range(100):
+    for i in range(40):
         step += 1
         print('iteration: \t{0}'.format(i))
         last_only(model=ppnet)
@@ -110,7 +109,11 @@ if optimize_last_layer:
         accu = valid(model=ppnet, dataloader=valid_loader, config=config, step=step,
                      weighting_attention=args.weighting_attention)
         if current_push_best_accu < accu:
+            print('New best score: {}, saving snapshot'.format(accu))
             save_train_state(os.path.join(model_dir, original_model_name.split('push')[0] + 'prune'), ppnet, {}, step,
                              mode, epoch,
                              iteration, experiment_run_name, best_accu, accu, accu, config)
             current_push_best_accu = accu
+
+test(model=ppnet, dataloader=test_loader, config=config, step=step,
+     weighting_attention=args.weighting_attention)
