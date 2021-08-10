@@ -40,7 +40,7 @@ optimize_last_layer = True
 k = 6
 prune_threshold = 6
 find_threshold_prune_n_patches = 4
-only_n_most_activated =  200
+only_n_most_activated = None
 # epoch = 50
 
 original_model_dir = os.path.dirname(load_state_path)
