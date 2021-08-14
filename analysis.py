@@ -47,13 +47,15 @@ def generate_prototype_activation_matrix(ppnet, test_push_dataloader, push_datal
     # print('Prototypes are chosen from ' + str(len(set(prototype_img_identity))) + ' number of classes.')
     # print('Their class identities are: ' + str(prototype_img_identity))
 
-    raw, bag, label = next(((b, r, l) for b, r, l in iter(test_push_dataloader) if l.max().unsqueeze(0) == bag_class and len(b) >= N))
+    raw, bag, label = next(
+        ((r, b, l) for r, b, l in iter(test_push_dataloader) if l.max().unsqueeze(0) == bag_class and len(b) >= N))
 
     count_positive_patches = sum(label)
     if len(label) > 1:
         label = label.max().unsqueeze(0)
 
     bag = bag.squeeze(0)
+    img_size = raw[0].shape[1]
 
     with torch.no_grad():
         ppnet.eval()
@@ -195,8 +197,8 @@ def generate_prototype_activation_matrix(ppnet, test_push_dataloader, push_datal
     for j in range(2 + k, 2 * N + 2 + k, 2):
         for i in range(2, len_proto + 2):
             main_ax = fig.add_subplot(grid[i, j])
-            main_ax.set_xlim([0, 27])
-            main_ax.set_ylim([0, 27])
+            main_ax.set_xlim([0, img_size])
+            main_ax.set_ylim([0, img_size])
             main_ax.invert_yaxis()
             main_ax.imshow(imgs_with_self_activation_by_prototype[l][i - 2], aspect='auto')
 
@@ -216,8 +218,8 @@ def generate_prototype_activation_matrix(ppnet, test_push_dataloader, push_datal
     # prototypes images with activation
     for i in range(2, len_proto + 2):
         main_ax = fig.add_subplot(grid[i, 0 + k])
-        main_ax.set_xlim([0, 27])
-        main_ax.set_ylim([0, 27])
+        main_ax.set_xlim([0, img_size])
+        main_ax.set_ylim([0, img_size])
         main_ax.invert_yaxis()
         main_ax.imshow(prototypes_img_with_act[i - 2])
 
@@ -234,8 +236,8 @@ def generate_prototype_activation_matrix(ppnet, test_push_dataloader, push_datal
     for j in range(k):
         for i in range(2, len_proto + 2):
             main_ax = fig.add_subplot(grid[i, j])
-            main_ax.set_xlim([0, 27])
-            main_ax.set_ylim([0, 27])
+            main_ax.set_xlim([0, img_size])
+            main_ax.set_ylim([0, img_size])
             main_ax.invert_yaxis()
             main_ax.imshow(k_nearest_patches[i - 2][j])
 
@@ -246,8 +248,8 @@ def generate_prototype_activation_matrix(ppnet, test_push_dataloader, push_datal
     l = 0
     for i in range(2 + k, 2 * N + 2 + k, 2):
         main_ax = fig.add_subplot(grid[0:2, i:i + 2])
-        main_ax.set_xlim([0, 27])
-        main_ax.set_ylim([0, 27])
+        main_ax.set_xlim([0, img_size])
+        main_ax.set_ylim([0, img_size])
         main_ax.invert_yaxis()
         main_ax.set_title(f'{at[top_patches[l]]:.3f}', fontsize=25)
         main_ax.imshow(imgs[l], aspect='auto')

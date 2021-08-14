@@ -11,8 +11,6 @@ from preprocess import preprocess_input_function
 from save import load_train_state, save_train_state
 from train_and_test import test, last_only, train, valid
 
-parser = argparse.ArgumentParser()
-
 args, config, seed, DEBUG, load_state_path, checkpoint_file_prefix = load_or_create_experiment(force_load=True)
 
 workers = 0 if DEBUG else 4
@@ -39,7 +37,7 @@ optimize_last_layer = True
 # pruning parameters
 k = 6
 prune_threshold = 6
-find_threshold_prune_n_patches = 4
+find_threshold_prune_n_patches = 8
 only_n_most_activated = None
 # epoch = 50
 
