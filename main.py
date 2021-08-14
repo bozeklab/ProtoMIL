@@ -73,15 +73,18 @@ warm_optimizer_specs = [
     },
     {
         'params': ppnet.attention_V.parameters(),
-        'lr': config.last_layer_optimizer_lr['attention']
+        'lr': config.last_layer_optimizer_lr['attention'],
+        #'weight_decay': 1e-3
     },
     {
         'params': ppnet.attention_U.parameters(),
-        'lr': config.last_layer_optimizer_lr['attention']
+        'lr': config.last_layer_optimizer_lr['attention'],
+        #'weight_decay': 1e-3
     },
     {
         'params': ppnet.attention_weights.parameters(),
-        'lr': config.last_layer_optimizer_lr['attention']
+        'lr': config.last_layer_optimizer_lr['attention'],
+        #'weight_decay': 1e-3
     }
 ]
 
@@ -92,15 +95,18 @@ last_layer_optimizer_specs = [
     },
     {
         'params': ppnet.attention_V.parameters(),
-        'lr': config.last_layer_optimizer_lr['attention']
+        'lr': config.last_layer_optimizer_lr['attention'],
+        #'weight_decay': 1e-3
     },
     {
         'params': ppnet.attention_U.parameters(),
-        'lr': config.last_layer_optimizer_lr['attention']
+        'lr': config.last_layer_optimizer_lr['attention'],
+        #'weight_decay': 1e-3
     },
     {
         'params': ppnet.attention_weights.parameters(),
-        'lr': config.last_layer_optimizer_lr['attention']
+        'lr': config.last_layer_optimizer_lr['attention'],
+        #'weight_decay': 1e-3
     }
 ]
 
