@@ -149,7 +149,7 @@ else:
     current_push_best_accu = 0.
     print('Starting new experiment: {}'.format(experiment_run_name))
     print('Saving code snapshot with git-experiments')
-    snapshot_code(experiment_run_name)
+    # snapshot_code(experiment_run_name)
 
 model_dir = os.path.join(SAVED_MODELS_PATH, experiment_run_name)
 makedir(model_dir)
@@ -265,16 +265,12 @@ while True:
         iteration += 1
         push_model_state_epoch = epoch
         if iteration >= config.num_last_layer_iterations:
-            log_writer.add_figure('prototype_analysis/positive',
-                                  generate_prototype_activation_matrix(ppnet, valid_push_loader, train_push_loader,
-                                                                       epoch,
-                                                                       model_dir, torch.device('cuda'), bag_class=1)
-                                  , global_step=step)
-            log_writer.add_figure('prototype_analysis/negative',
-                                  generate_prototype_activation_matrix(ppnet, valid_push_loader, train_push_loader,
-                                                                       epoch,
-                                                                       model_dir, torch.device('cuda'), bag_class=0)
-                                  , global_step=step)
+            pos_matrix, neg_matrix = generate_prototype_activation_matrices(ppnet, valid_push_loader,
+                                                                            train_push_loader,
+                                                                            epoch,
+                                                                            model_dir, torch.device('cuda'))
+            log_writer.add_figure('prototype_analysis/positive', pos_matrix, global_step=step)
+            log_writer.add_figure('prototype_analysis/negative', neg_matrix, global_step=step)
             iteration = None
             epoch += 1
             mode = TrainMode.JOINT

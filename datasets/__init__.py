@@ -7,9 +7,11 @@ from datasets.camelyon_dataset import CamelyonPreprocessedBagsCross
 from datasets.colon_dataset import ColonCancerBagsCross
 from datasets.mnist_dataset import MnistBags
 from datasets.messidor_dataset import DiabeticRetinopathyDataset
+from datasets.rcc_dataset import RCCPreprocessedBagsCross
 
 PATH_TO_MESSIDOR_PATCH = '/shared/sets/datasets/vision/messidor/retina_patches/patches.csv'
 PATH_TO_MESSIDOR_LABELS = '/shared/sets/datasets/vision/messidor/messidor_scaled_700x700/trainLabels.csv'
+
 
 def get_train(name, seed=3, workers=0, config=None):
     if name == 'colon_cancer':
@@ -32,10 +34,17 @@ def get_train(name, seed=3, workers=0, config=None):
         ds_push = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=True, push=True, shuffle_bag=True,
                                                 random_state=seed)
     elif name == 'messidor':
-        ds = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=True, shuffle_bag=True, 
-                                        data_augmentation=True, fold_id=config.fold_id, folds=config.folds, random_state=seed)
-        ds_push = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=True, push=True, 
-                                             shuffle_bag=True, fold_id=config.fold_id, folds=config.folds, random_state=seed)
+        ds = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=True, shuffle_bag=True,
+                                        data_augmentation=True, fold_id=config.fold_id, folds=config.folds,
+                                        random_state=seed)
+        ds_push = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=True, push=True,
+                                             shuffle_bag=True, fold_id=config.fold_id, folds=config.folds,
+                                             random_state=seed)
+    elif name == 'rcc':
+        ds = RCCPreprocessedBagsCross(path="data/RCC_patches", train=True, shuffle_bag=True,
+                                      data_augmentation=True, random_state=seed, fold_id=config.fold_id)
+        ds_push = RCCPreprocessedBagsCross(path="data/RCC_patches", train=True, push=True, shuffle_bag=True,
+                                           random_state=seed, fold_id=config.fold_id)
     else:
         raise NotImplementedError()
 
@@ -78,11 +87,17 @@ def get_valid(name, seed=3, workers=0, config=None):
         ds_push_valid = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=False, all_labels=True,
                                                       random_state=seed, push=True, )
     elif name == 'messidor':
-        ds_valid = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=False, fold_id=config.fold_id, 
+        ds_valid = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=False,
+                                              fold_id=config.fold_id,
                                               folds=config.folds, random_state=seed)
-        ds_push_valid = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=False, fold_id=config.fold_id, 
+        ds_push_valid = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=False,
+                                                   fold_id=config.fold_id,
                                                    folds=config.folds, random_state=seed, push=True)
-
+    elif name == 'rcc':
+        ds_valid = RCCPreprocessedBagsCross(path="data/RCC_patches", train=False, shuffle_bag=True,
+                                      random_state=seed, fold_id=config.fold_id)
+        ds_push_valid = RCCPreprocessedBagsCross(path="data/RCC_patches", train=False, push=True, shuffle_bag=True,
+                                           random_state=seed, fold_id=config.fold_id)
     else:
         raise NotImplementedError()
 
@@ -120,11 +135,18 @@ def get_test(name, seed=3, workers=0, config=None):
                                                 random_state=seed)
         ds_push_test = CamelyonPreprocessedBagsCross(path="data/CAMELYON_patches", train=False, test=True,
                                                      all_labels=True, push=True)
+    elif name == 'rcc':
+        ds_test = RCCPreprocessedBagsCross(path="data/RCC_patches", train=False, test=True, shuffle_bag=True,
+                                      random_state=seed, fold_id=config.fold_id)
+        ds_push_test = RCCPreprocessedBagsCross(path="data/RCC_patches", train=False, test=True, push=True, shuffle_bag=True,
+                                           random_state=seed, fold_id=config.fold_id)
     elif name == 'messidor':
-        ds_test = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=False, test=True, 
+        ds_test = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=False, test=True,
                                              fold_id=config.fold_id, folds=config.folds, random_state=seed)
-        ds_push_test = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=False, test=True, 
-                                                  fold_id=config.fold_id, folds=config.folds, random_state=seed, push=True)
+        ds_push_test = DiabeticRetinopathyDataset(PATH_TO_MESSIDOR_PATCH, PATH_TO_MESSIDOR_LABELS, train=False,
+                                                  test=True,
+                                                  fold_id=config.fold_id, folds=config.folds, random_state=seed,
+                                                  push=True)
 
     else:
         raise NotImplementedError()

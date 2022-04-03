@@ -78,7 +78,8 @@ def load_or_create_experiment(force_load=False):
     parser = argparse.ArgumentParser(prog='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-g', '--gpuid', type=int, default=0, help='CUDA device id to use')
     parser.add_argument('-d', '--dataset', type=str, required=True, choices=['mnist', 'colon_cancer', 'breast_cancer',
-                                                                             'camelyon', 'messidor'], help='Select dataset')
+                                                                             'camelyon', 'messidor', 'rcc'],
+                        help='Select dataset')
     parser.add_argument('-n', '--new_experiment', default=False, action='store_true',
                         help='Overwrite any saved state and start a new experiment (saved checkpoint will be lost)')
     parser.add_argument('-l', '--load_state', metavar='STATE_FILE', type=str, default=None, required=force_load,

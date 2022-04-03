@@ -39,7 +39,7 @@ k = 6
 prune_threshold = 6
 find_threshold_prune_n_patches = 8
 only_n_most_activated = None
-# epoch = 50
+epoch = (epoch // 10) * 10
 
 original_model_dir = os.path.dirname(load_state_path)
 original_model_name = os.path.basename(load_state_path)
@@ -98,7 +98,7 @@ if optimize_last_layer:
 
     print('optimize last layer')
 
-    for i in range(40):
+    for i in range(20):
         step += 1
         print('iteration: \t{0}'.format(i))
         last_only(model=ppnet)
