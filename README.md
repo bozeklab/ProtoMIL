@@ -1,5 +1,5 @@
 This code package implements the Prototypical Multiple Instance Learning Network (ProtoMIL) by Dawid Rymarczyk,
-Aneta Kaczyńska, Jarosław Kraus, Adam Pardyl and Bartosz Zieliński.
+Aneta Kaczyńska, Jarosław Kraus, Adam Pardyl, Mark Skomorowski and Bartosz Zieliński.
 
 This package includes code developped by authors of the paper "This Looks Like That: Deep Learning for Interpretable
 Image Recognition" - Chaofan Chen* (Duke University), Oscar Li* (Duke University),Chaofan Tao (Duke University),
