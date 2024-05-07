@@ -210,6 +210,39 @@ BREAST_CANCER_SETTINGS = Settings(
     push_epochs=[i for i in range(200) if i % 20 == 0]
 )
 
+MITO_SETTINGS = Settings(
+    base_architecture='noop',
+    img_size=224,
+    noop_features_size=(512, 7, 7),
+    prototype_number=4,
+    prototype_latent=128,
+    prototype_conv_dim=(2, 2),
+    joint_optimizer_lrs={
+        'features': 3e-5,
+        'add_on_layers': 3e-5,
+        'prototype_vectors': 3e-5,
+    },
+    joint_lr_step_size=10,
+    joint_lr_gamma=0.1,
+    warm_optimizer_lrs={
+        'features': 1e-3,
+        'add_on_layers': 1e-3,
+        'prototype_vectors': 1e-3,
+        'attention': 1e-3,
+        'last_layer': 1e-3,
+    },
+    warm_lr_gamma=0.97,
+    last_layer_optimizer_lr={
+        'attention': 1e-3,
+        'last_layer': 1e-4,
+    },
+    num_train_epochs=61,
+    num_warm_epochs=50,
+    num_last_layer_iterations=40,
+    push_start=50,
+    push_epochs=[i for i in range(200) if i % 10 == 0]
+)
+
 CAMELYON_SETTINGS = Settings(
     base_architecture='noop',
     img_size=224,
@@ -314,6 +347,7 @@ def get_settings(name: str):
     return {
         'colon_cancer': COLON_CANCER_SETTINGS,
         'breast_cancer': BREAST_CANCER_SETTINGS,
+        'mito': MITO_SETTINGS,
         'mnist': MNIST_SETTINGS,
         'camelyon': CAMELYON_SETTINGS,
         'messidor': MESSIDOR_SETTINGS,

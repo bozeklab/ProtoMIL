@@ -9,7 +9,7 @@ import glob
 from skimage import io
 from PIL import Image
 
-patch_size = 256
+patch_size = 224
 overlay = int(0.0 * patch_size)
 
 def extract_patches(img, out_dir):

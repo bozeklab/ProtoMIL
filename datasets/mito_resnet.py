@@ -5,6 +5,7 @@ import glob
 
 import torch
 import torchvision
+import torchvision.models as models
 from torch.utils.data import Dataset
 from torchvision.datasets.folder import pil_loader
 from torchvision.transforms import transforms
@@ -23,15 +24,7 @@ def load_model_weights(model, weights):
     return model
 
 
-model = torchvision.models.__dict__['resnet18'](pretrained=False)
-
-state = torch.load(MODEL_PATH, map_location='cuda:0')
-
-state_dict = state['state_dict']
-for key in list(state_dict.keys()):
-    state_dict[key.replace('model.', '').replace('resnet.', '')] = state_dict.pop(key)
-
-model = load_model_weights(model, state_dict)
+model = models.resnet18(pretrained=True)
 
 
 # model.fc = torch.nn.Sequential()
