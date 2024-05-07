@@ -212,8 +212,8 @@ BREAST_CANCER_SETTINGS = Settings(
 
 MITO_SETTINGS = Settings(
     base_architecture='noop',
-    img_size=224,
-    noop_features_size=(512, 7, 7),
+    img_size=256,
+    noop_features_size=(512, 8, 8),
     prototype_number=8,
     prototype_latent=128,
     prototype_conv_dim=(2, 2),

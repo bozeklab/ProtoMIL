@@ -34,8 +34,20 @@ class MitoPreprocessedBagsCross(data_utils.Dataset):
 
         self.embed_name = 'embeddings.pth'
 
-        self.dir_list = [d for d in self.labels.keys() if os.path.exists(os.path.join(d, self.embed_name))]
+        self.dir_list = np.array([d for d in self.labels.keys() if os.path.exists(os.path.join(d, self.embed_name))])
 
+        np.random.seed(self.random_state)
+        array_size = len(self.dir_list)
+        train_mask = np.random.rand(array_size) < 0.8
+        if self.train:
+            self.dir_list = self.dir_list[train_mask]
+        else:
+            self.dir_list = self.dir_list[~train_mask]
+
+        sum = 0
+        for p in self.dir_list:
+            sum += self.labels[p]
+        print(f'percentage of cl is {sum/len(self.dir_list)}')
 
     @classmethod
     def load_raw_image(cls, path):
