@@ -9,7 +9,7 @@ import glob
 from skimage import io
 from PIL import Image
 
-patch_size = 224
+patch_size = 256
 overlay = int(0.0 * patch_size)
 
 def extract_patches(img, out_dir):
@@ -22,7 +22,6 @@ def extract_patches(img, out_dir):
         for y in range(0, dim_y, patch_size - overlay):
             patch = img[x:x + patch_size, y:y + patch_size]
             Image.fromarray(patch).save(os.path.join(out_dir, str(idx) + ".jpg"))
-            print('patch', idx)
             idx += 1
 
 
@@ -32,10 +31,9 @@ def get_all_tifs(path):
     return dirs
 
 if __name__ == '__main__':
-    path = 'data/mito_test'
+    path = 'data/mito'
     for dir in get_all_tifs(path):
-        out_dir = dir.replace('mito_test', 'mito_test_patches')
+        out_dir = dir.replace('mito', 'mito_patches')
         print(dir)
         img = io.imread(dir)
         extract_patches(img, out_dir)
-        print('done', path)

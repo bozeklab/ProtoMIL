@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 from torchvision.datasets.folder import pil_loader
 from torchvision.transforms import transforms
 
-MODEL_PATH = 'data/tenpercent_resnet18.ckpt'
+# MODEL_PATH = 'data/tenpercent_resnet18.ckpt'
 
 
 def load_model_weights(model, weights):
@@ -70,14 +70,14 @@ def get_dir_list(path):
     dirs.sort()
     return dirs
 
-for dataset_path in get_dir_list('data/mito_test_patches/**/*.tif/'):
+for dataset_path in get_dir_list('data/mito_patches/**/*.tif/'):
     out_file = os.path.join(dataset_path, 'embeddings.pth')
     if not os.path.isdir(dataset_path):
         print('no data for', dataset_path)
         continue
-    if os.path.exists(out_file):
-        print('skipping already processed', dataset_path)
-        continue
+    # if os.path.exists(out_file):
+    #     print('skipping already processed', dataset_path)
+    #     continue
     print('processing', dataset_path)
 
     loader = torch.utils.data.DataLoader(ImageDataset(dataset_path),
@@ -91,6 +91,7 @@ for dataset_path in get_dir_list('data/mito_test_patches/**/*.tif/'):
             photos = photos.cuda()
             out = model(photos)
             out = out.cpu().detach()
+            print(out.shape)
             embeds.append(out)
             print('batch {} of {}'.format(idx, len(loader.dataset) // 100))
 

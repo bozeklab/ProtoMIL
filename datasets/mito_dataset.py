@@ -49,7 +49,7 @@ class MitoPreprocessedBagsCross(data_utils.Dataset):
 
         def __getitem__(self, item):
             return MitoPreprocessedBagsCross.load_raw_image(
-                os.path.join(self.path, self.dir, '{}.jpg'.format(int(self.indices[item]))))
+                os.path.join(self.dir, '{}.jpg'.format(int(self.indices[item]))))
 
     def __len__(self):
         return len(self.dir_list)
