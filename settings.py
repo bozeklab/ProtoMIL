@@ -50,6 +50,8 @@ class Settings:
     folds: int = 10
     fold_id: int = 0
 
+    overlay: float = 0.
+
     random_seed_presets: List[int] = dataclasses.field(
         default_factory=lambda: [631056511, 923928841, 53306087, 937272127, 207121037])
     random_seed_id: int = 0
@@ -210,10 +212,12 @@ BREAST_CANCER_SETTINGS = Settings(
     push_epochs=[i for i in range(200) if i % 20 == 0]
 )
 
+mito_patch_size = 512
 MITO_SETTINGS = Settings(
     base_architecture='noop',
-    img_size=256,
-    noop_features_size=(512, 8, 8),
+    img_size=mito_patch_size,
+    overlay=0.15,
+    noop_features_size=(512, mito_patch_size//32, mito_patch_size//32),
     prototype_number=8,
     prototype_latent=128,
     prototype_conv_dim=(2, 2),
