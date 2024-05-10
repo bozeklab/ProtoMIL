@@ -55,7 +55,7 @@ normalize_to_tensor_transform = transforms.Compose([
 
 class ImageDataset(Dataset):
     def __init__(self, dataset_path):
-        self.files = list(str(p) for p in pathlib.Path(dataset_path).rglob('*.jpg'))
+        self.files = list(str(p) for p in pathlib.Path(dataset_path).rglob('*[0-9].jpg'))
 
     def __len__(self):
         return len(self.files)
@@ -70,7 +70,7 @@ def get_dir_list(path):
     dirs.sort()
     return dirs
 
-for dataset_path in get_dir_list('data/mito_patches/**/*.tif/'):
+for dataset_path in get_dir_list('data/mito_patches_512/**/*.tif/'):
     out_file = os.path.join(dataset_path, 'embeddings.pth')
     if not os.path.isdir(dataset_path):
         print('no data for', dataset_path)
@@ -91,7 +91,6 @@ for dataset_path in get_dir_list('data/mito_patches/**/*.tif/'):
             photos = photos.cuda()
             out = model(photos)
             out = out.cpu().detach()
-            print(out.shape)
             embeds.append(out)
             print('batch {} of {}'.format(idx, len(loader.dataset) // 100))
 
