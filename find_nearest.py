@@ -42,7 +42,7 @@ class ImagePatch:
 class ImagePatchLazy:
 
     def __init__(self, label, distance, batch_idx, image_idx, dataset, protoL_rf_info, distance_map_j,
-                 prototype_activation_function_in_numpy, prototype_activation_function, max_dist, epsilon):
+                 prototype_activation_function_in_numpy, prototype_activation_function, max_dist, epsilon, trace):
         self.label = label
         self.negative_distance = -distance
         self.batch_idx = batch_idx
@@ -54,6 +54,7 @@ class ImagePatchLazy:
         self.prototype_activation_function = prototype_activation_function
         self.max_dist = max_dist
         self.epsilon = epsilon
+        self.trace = trace
 
     @cached_property
     def original_raw(self):
@@ -186,7 +187,8 @@ def find_k_nearest_patches_to_prototypes(dataloader,  # pytorch dataloader (must
                             prototype_activation_function_in_numpy=prototype_activation_function_in_numpy,
                             prototype_activation_function=ppnet.prototype_activation_function,
                             max_dist=max_dist,
-                            epsilon=ppnet.epsilon
+                            epsilon=ppnet.epsilon,
+                            trace=search_batch_raw.dir[22:-5].replace('/', '_') + '_' + str(img_idx)
                         )
                     else:
                         closest_patch = ImagePatchInfo(label=search_y[0],
@@ -225,7 +227,7 @@ def find_k_nearest_patches_to_prototypes(dataloader,  # pytorch dataloader (must
 
                 # save the original image where the patch comes from
                 plt.imsave(fname=os.path.join(dir_for_saving_images,
-                                              'nearest-' + str(i + 1) + '_original.png'),
+                                              'nearest-' + str(i + 1) + '_original' + patch.trace + '.png'),
                            arr=patch.original_img,
                            vmin=0.0,
                            vmax=1.0)

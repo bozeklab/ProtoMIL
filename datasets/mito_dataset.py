@@ -1,6 +1,7 @@
 import os.path
 import glob
 
+import random
 import numpy as np
 import torch
 import torch.utils.data as data_utils
@@ -34,7 +35,10 @@ class MitoPreprocessedBagsCross(data_utils.Dataset):
 
         self.embed_name = 'embeddings.pth'
 
-        self.dir_list = np.array([d for d in self.labels.keys() if os.path.exists(os.path.join(d, self.embed_name))])
+        dir_shuffled = list(self.labels.keys())
+        random.shuffle(dir_shuffled)
+        self.dir_list = np.array([d for d in dir_shuffled
+                                  if os.path.exists(os.path.join(d, self.embed_name))])
 
         np.random.seed(self.random_state)
         array_size = len(self.dir_list)
