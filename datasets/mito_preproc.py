@@ -15,6 +15,9 @@ from settings import MITO_SETTINGS
 patch_size = MITO_SETTINGS.img_size
 overlay = int(MITO_SETTINGS.overlay * patch_size)
 
+print(f'rows and columns of pixels lost = {(4096 - overlay) % (patch_size - overlay)}')
+
+
 
 def normalize_image(image):
     clip = 0.02
@@ -35,18 +38,19 @@ def extract_patches(img, out_dir):
     idx = 0
 
     img = normalize_image(img)
-    img = np.pad(img, [(0, patch_size), (0, patch_size)], mode='constant')
+    #img = np.pad(img, [(0, patch_size), (0, patch_size)], mode='constant')
     img_with_rects = img.copy()
 
-    for x in range(0, dim_x, patch_size - overlay):
-        for y in range(0, dim_y, patch_size - overlay):
+    stride = patch_size - overlay
+    for x in range(0, dim_x - patch_size + 1, stride):
+        for y in range(0, dim_y - patch_size, stride):
             patch = img[x:x + patch_size, y:y + patch_size]
             Image.fromarray(patch).save(os.path.join(out_dir, str(idx) + ".jpg"))
 
             cv.rectangle(img_with_rects, (y, x), (y + patch_size, x + patch_size), 0, 5)
             idx += 1
 
-    cv.imwrite(os.path.join(out_dir, 'patch_vis' + ".jpg"), img_with_rects)
+    cv.imwrite(os.path.join(out_dir, 'patch_vis' + ".png"), img_with_rects)
 
 
 def get_all_tifs(path):
