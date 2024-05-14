@@ -20,6 +20,7 @@ class MitoPreprocessedBagsCross(data_utils.Dataset):
                  loc_info=False, folds=10, fold_id=1, random_state=3, all_labels=False, max_bag=20000):
         self.path = path
         self.train = train
+        self.test = test
         self.fold_id = fold_id
         self.random_state = random_state
         self.push = push
@@ -35,23 +36,27 @@ class MitoPreprocessedBagsCross(data_utils.Dataset):
 
         self.embed_name = 'embeddings.pth'
 
+        # shuffle order of files
         dir_shuffled = list(self.labels.keys())
+        random.seed(self.random_state)
         random.shuffle(dir_shuffled)
         self.dir_list = np.array([d for d in dir_shuffled
                                   if os.path.exists(os.path.join(d, self.embed_name))])
 
-        np.random.seed(self.random_state)
-        array_size = len(self.dir_list)
-        train_mask = np.random.rand(array_size) < 0.8
+        # train val test split
+        proportions = {0: 0.7, 1: 0.15, 2: 0.15}
+        elements_count = {key: int(len(self.dir_list) * value) for key, value in proportions.items()}
+        result_list = []
+        for key, count in elements_count.items():
+            result_list.extend([key] * count)
+        random.shuffle(result_list)
+        result_list = np.array(result_list)
         if self.train:
-            self.dir_list = self.dir_list[train_mask]
+            self.dir_list = self.dir_list[result_list == 0]
+        elif self.test:
+            self.dir_list = self.dir_list[result_list == 1]
         else:
-            self.dir_list = self.dir_list[~train_mask]
-
-        sum = 0
-        for p in self.dir_list:
-            sum += self.labels[p]
-        print(f'percentage of cl is {sum/len(self.dir_list)}')
+            self.dir_list = self.dir_list[result_list == 2]
 
     @classmethod
     def load_raw_image(cls, path):
