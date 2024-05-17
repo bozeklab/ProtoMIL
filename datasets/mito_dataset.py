@@ -31,8 +31,14 @@ class MitoPreprocessedBagsCross(data_utils.Dataset):
         self.r = np.random.RandomState(random_state)
         self.max_bag = max_bag
         self.labels = {}
+
         for p in get_dir_list(path + '/**/*.tif/'):
-            self.labels[p] = 0 if 'fl_fl' in p else 1
+            if '/fl_fl/' in p:
+                self.labels[p] = 0
+            elif '/cl1/' in p:
+                self.labels[p] = 1
+            else:
+                self.labels[p] = 2
 
         self.embed_name = 'embeddings.pth'
 
@@ -43,8 +49,8 @@ class MitoPreprocessedBagsCross(data_utils.Dataset):
         self.dir_list = np.array([d for d in dir_shuffled
                                   if os.path.exists(os.path.join(d, self.embed_name))])
 
-        # train val test split
-        proportions = {0: 0.7, 1: 0.15, 2: 0.15}
+        # TODO zrob to tak zeby sie nie psulo przy innych proportions xd train val test split
+        proportions = {0: 0.6, 1: 0.2, 2: 0.2}
         elements_count = {key: int(len(self.dir_list) * value) for key, value in proportions.items()}
         result_list = []
         for key, count in elements_count.items():
@@ -57,6 +63,7 @@ class MitoPreprocessedBagsCross(data_utils.Dataset):
             self.dir_list = self.dir_list[result_list == 1]
         else:
             self.dir_list = self.dir_list[result_list == 2]
+
 
     @classmethod
     def load_raw_image(cls, path):

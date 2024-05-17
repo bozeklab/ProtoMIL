@@ -39,7 +39,7 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     total_separation_cost = 0
     total_avg_separation_cost = 0
     total_loss = 0
-    conf_matrix = np.zeros((2, 2), dtype='int32')
+    conf_matrix = np.zeros((3, 3), dtype='int32')
     preds = []
     targets = []
 
@@ -125,7 +125,7 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
                 preds.append(pred_s.data.cpu().numpy())
                 targets.append(target.cpu().numpy())
 
-                conf_matrix += confusion_matrix(target.cpu().numpy(), predicted.cpu().numpy(), labels=[0, 1])
+                conf_matrix += confusion_matrix(target.cpu().numpy(), predicted.cpu().numpy(), labels=[0, 1, 2])
 
                 n_batches += 1
                 total_cross_entropy += cross_entropy.item()
@@ -164,15 +164,16 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
 
     preds = np.concatenate(preds)
     targets = np.concatenate(targets)
-    auc = roc_auc_score(targets, preds[..., 1])
+    #auc = roc_auc_score(targets, preds[..., 1])
     pred_y = preds.argmax(1)
-    precision = precision_score(targets, pred_y, zero_division=0)
-    recall = recall_score(targets, pred_y, zero_division=0)
-    f1 = f1_score(targets, pred_y, zero_division=0)
-    fpr, tpr, threshold = roc_curve(targets, preds[..., 1])
+    precision = precision_score(targets, pred_y, labels=[0, 1, 2], zero_division=0, average='weighted')
+    recall = recall_score(targets, pred_y, labels=[0, 1, 2], zero_division=0, average='weighted')
+    f1 = f1_score(targets, pred_y, labels=[0, 1, 2], zero_division=0, average='weighted')
+    # TODO separately for class
+    #fpr, tpr, threshold = roc_curve(targets, preds[..., 1])
 
     print('\t\taccuracy:', n_correct / n_examples)
-    print('\t\tauc:', auc)
+    #print('\t\tauc:', auc)
     print('\t\ttotal_loss:', total_loss)
 
     if is_train:
@@ -195,7 +196,7 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
                                   global_step=step)
 
         log_writer.add_scalar('accuracy' + suffix, n_correct / n_examples, global_step=step)
-        log_writer.add_scalar('auc' + suffix, auc, global_step=step)
+        #log_writer.add_scalar('auc' + suffix, auc, global_step=step)
         log_writer.add_scalar('precision' + suffix, precision, global_step=step)
         log_writer.add_scalar('recall' + suffix, recall, global_step=step)
         log_writer.add_scalar('f-score' + suffix, f1, global_step=step)
@@ -205,7 +206,7 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
 
         plt.figure()
         plt.title('Receiver Operating Characteristic')
-        plt.plot(fpr, tpr, 'b', label='AUC = %0.2f' % auc)
+        #plt.plot(fpr, tpr, 'b', label='AUC = %0.2f' % auc)
         plt.legend(loc='lower right')
         plt.plot([0, 1], [0, 1], 'r--')
         plt.xlim([0, 1])
@@ -222,7 +223,7 @@ def _train_or_test(model, dataloader, config: Settings, optimizer=None, use_l1_m
     if log_writer:
         log_writer.add_scalar('p_avg_pair_dist' + suffix, p_avg_pair_dist, global_step=step)
 
-    return auc
+    return n_correct / n_examples
 
 
 def train(model, dataloader, optimizer, config: Settings, log_writer: SummaryWriter = None,
