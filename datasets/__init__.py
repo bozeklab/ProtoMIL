@@ -26,9 +26,9 @@ def get_train(name, seed=3, workers=0, config=None):
         ds_push = BreastCancerBagsCross(path="data/Bisque", train=True, push=True, shuffle_bag=True,
                                         fold_id=config.fold_id, folds=config.folds, random_state=seed)
     elif name == 'mito':
-        ds = MitoPreprocessedBagsCross(path="data/mito_patches_512", train=True, shuffle_bag=True, data_augmentation=True,
+        ds = MitoPreprocessedBagsCross(path="data/mito_all_patches_512", train=True, shuffle_bag=True, data_augmentation=True,
                                    fold_id=config.fold_id, folds=config.folds, random_state=seed)
-        ds_push = MitoPreprocessedBagsCross(path="data/mito_patches_512", train=True, push=True, shuffle_bag=True,
+        ds_push = MitoPreprocessedBagsCross(path="data/mito_all_patches_512", train=True, push=True, shuffle_bag=True,
                                         fold_id=config.fold_id, folds=config.folds, random_state=seed)
     elif name == 'mnist':
         ds = MnistBags(train=True, random_state=seed, **config.dataset_settings)
@@ -83,9 +83,9 @@ def get_valid(name, seed=3, workers=0, config=None):
                                               folds=config.folds, random_state=seed, push=True, )
 
     elif name == 'mito':
-        ds_valid = MitoPreprocessedBagsCross(path="data/mito_patches_512", train=False, all_labels=True, fold_id=config.fold_id,
+        ds_valid = MitoPreprocessedBagsCross(path="data/mito_all_patches_512", train=False, all_labels=True, fold_id=config.fold_id,
                                          folds=config.folds, random_state=seed)
-        ds_push_valid = MitoPreprocessedBagsCross(path="data/mito_patches_512", train=False, all_labels=True, fold_id=config.fold_id,
+        ds_push_valid = MitoPreprocessedBagsCross(path="data/mito_all_patches_512", train=False, all_labels=True, fold_id=config.fold_id,
                                               folds=config.folds, random_state=seed, push=True, )
 
     elif name == 'mnist':
@@ -139,9 +139,9 @@ def get_test(name, seed=3, workers=0, config=None):
         ds_push_test = BreastCancerBagsCross(path="data/Bisque", train=False, test=True, push=True, all_labels=True,
                                              fold_id=config.fold_id, folds=config.folds, random_state=seed)
     elif name == 'mito':
-        ds_test = MitoPreprocessedBagsCross(path="data/mito_patches_512", train=False, test=True, all_labels=True,
+        ds_test = MitoPreprocessedBagsCross(path="data/mito_all_patches_512", train=False, test=True, all_labels=True,
                                         fold_id=config.fold_id, folds=config.folds, random_state=seed)
-        ds_push_test = MitoPreprocessedBagsCross(path="data/mito_patches_512", train=False, test=True, push=True, all_labels=True,
+        ds_push_test = MitoPreprocessedBagsCross(path="data/mito_all_patches_512", train=False, test=True, push=True, all_labels=True,
                                              fold_id=config.fold_id, folds=config.folds, random_state=seed)
     elif name == 'mnist':
         ds_test = MnistBags(train=False, test=True, random_state=seed, **config.dataset_settings, all_labels=True)

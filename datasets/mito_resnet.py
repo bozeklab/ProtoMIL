@@ -70,7 +70,7 @@ def get_dir_list(path):
     dirs.sort()
     return dirs
 
-for dataset_path in get_dir_list('data/mito_patches_512/**/*.tif/'):
+for dataset_path in get_dir_list('data/mito_all_patches_512/**/*.tif/'):
     out_file = os.path.join(dataset_path, 'embeddings.pth')
     if not os.path.isdir(dataset_path):
         print('no data for', dataset_path)
@@ -92,7 +92,6 @@ for dataset_path in get_dir_list('data/mito_patches_512/**/*.tif/'):
             out = model(photos)
             out = out.cpu().detach()
             embeds.append(out)
-            print('batch {} of {}'.format(idx, len(loader.dataset) // 100))
 
     embeds = torch.cat(embeds, dim=0)
     torch.save(embeds, out_file)

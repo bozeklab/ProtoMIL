@@ -49,14 +49,14 @@ class MitoPreprocessedBagsCross(data_utils.Dataset):
         self.dir_list = np.array([d for d in dir_shuffled
                                   if os.path.exists(os.path.join(d, self.embed_name))])
 
-        # TODO zrob to tak zeby sie nie psulo przy innych proportions xd train val test split
-        proportions = {0: 0.6, 1: 0.2, 2: 0.2}
-        elements_count = {key: int(len(self.dir_list) * value) for key, value in proportions.items()}
-        result_list = []
-        for key, count in elements_count.items():
-            result_list.extend([key] * count)
-        random.shuffle(result_list)
-        result_list = np.array(result_list)
+        val_test_size = (0.15, 0.15)
+        length = len(self.dir_list)
+        result_list = np.zeros(length, dtype=int)
+        splits = [int(length * size) for size in val_test_size]
+        result_list[:splits[0]] = 1
+        result_list[splits[0]:splits[0] + splits[1]] = 2
+        np.random.seed(self.random_state)
+        np.random.shuffle(result_list)
         if self.train:
             self.dir_list = self.dir_list[result_list == 0]
         elif self.test:

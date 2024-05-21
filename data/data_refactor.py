@@ -6,32 +6,34 @@ import shutil
 
 # WARNING before using download mitochondria dataset from sciebo and name it mito_org
 
-def get_all_tifs(path):
-    dirs = glob.glob(path + '/**/*.tif', recursive=True)
+def get_all_tifs(key):
+    dirs = glob.glob(key, recursive=True)
+
     dirs = [d for d in dirs if 'mask' not in d]
     dirs.sort()
-    print(len(dirs))
+    #print(dirs)
+    print(f'{len(dirs)=}')
     return dirs
 
 if __name__ == '__main__':
-    new_dir = 'mito/'
-    old_dir = 'mito_org'
+    new_dir = 'mito_all/'
+    old_dir = 'Pictures without scale 8bit'
     dirs = ['', 'cl1', 'cl19', 'fl_fl']
     for d in dirs:
         os.makedirs(new_dir + d, exist_ok=True)
 
-    for file_in in get_all_tifs(old_dir):
+    for file_in in get_all_tifs(old_dir + '/**/10kX magnification/**/*.tif'):
         file_name = new_dir
-        if '/cl1/' in file_in:
+        if 'cl1/' in file_in:
             file_name += 'cl1/'
-        elif '/cl19/' in file_in:
+        elif 'cl19/' in file_in:
             file_name += 'cl19/'
         else:
             file_name += 'fl_fl/'
 
-        if '/E1/' in file_in:
+        if '/E1' in file_in:
             file_name += 'e1_'
-        elif '/E2/' in file_in:
+        elif '/E2' in file_in:
             file_name += 'e2_'
         else:
             file_name += 'e3_'

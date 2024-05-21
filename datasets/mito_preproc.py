@@ -21,9 +21,9 @@ print(f'rows and columns of pixels lost = {(4096 - overlay) % (patch_size - over
 
 def normalize_image(image):
     clip = 0.02
-    min_ = np.quantile(img, clip)
-    max_ = np.quantile(img, 1.0 - clip)
-    np.clip(img, min_, max_)
+    min_ = np.quantile(image, clip)
+    max_ = np.quantile(image, 1.0 - clip)
+    np.clip(image, min_, max_)
 
     mean_value = np.mean(image)
 
@@ -60,9 +60,9 @@ def get_all_tifs(path):
 
 
 if __name__ == '__main__':
-    path = 'data/mito'
+    path = 'data/mito_all'
     for dir in get_all_tifs(path):
-        out_dir = dir.replace('mito', 'mito_patches_512')
+        out_dir = dir.replace('mito_all', 'mito_all_patches_512')
         print(dir)
         img = io.imread(dir)
         extract_patches(img, out_dir)
