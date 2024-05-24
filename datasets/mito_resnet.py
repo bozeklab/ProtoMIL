@@ -73,7 +73,7 @@ def process_dataset(dataset_path):
     # if os.path.exists(out_file):
     #     print('skipping already processed', dataset_path)
     #     return
-    print('processing', dataset_path)
+    print(dataset_path)
 
     loader = torch.utils.data.DataLoader(
         ImageDataset(dataset_path),
@@ -95,6 +95,7 @@ def process_dataset(dataset_path):
 
 
 if __name__ == "__main__":
-    dataset_paths = get_dir_list('data/mito_all_patches_512/**/*.tif/')
-    with ThreadPoolExecutor(max_workers=16) as executor:
+    dataset_paths = get_dir_list('data/mito_scale_patches_800/**/*.tif/')
+    print(f'{len(dataset_paths)=}')
+    with ThreadPoolExecutor(max_workers=1) as executor:
         executor.map(process_dataset, dataset_paths)

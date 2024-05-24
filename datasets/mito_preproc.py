@@ -52,17 +52,18 @@ def get_all_tifs(path):
     dirs.sort()
     return dirs
 
-def process_image_file(dir, path):
-    out_dir = dir.replace('mito_all', 'mito_all_patches_512')
+def process_image_file(dir):
+    out_dir = dir.replace('mito_scale', 'mito_scale_patches_800')
     print(dir)
     img = io.imread(dir)
     extract_patches(img, out_dir)
 
 if __name__ == '__main__':
-    path = 'data/mito_all'
+    path = 'data/mito_scale'
     dirs = get_all_tifs(path)
+    print(f'{len(dirs)=}')
 
     with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(process_image_file, dir, path) for dir in dirs]
+        futures = [executor.submit(process_image_file, dir) for dir in dirs]
         for future in futures:
-            future.result()  # This will re-raise any exceptions caught during file processing
+            future.result()

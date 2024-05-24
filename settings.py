@@ -212,11 +212,11 @@ BREAST_CANCER_SETTINGS = Settings(
     push_epochs=[i for i in range(200) if i % 20 == 0]
 )
 
-mito_patch_size = 512
+mito_patch_size = 800
 MITO_SETTINGS = Settings(
     base_architecture='noop',
     img_size=mito_patch_size,
-    overlay=0.23,
+    overlay=0.33,
     noop_features_size=(512, mito_patch_size//32, mito_patch_size//32),
     num_classes=3,
     prototype_number=9,
